@@ -1,0 +1,79 @@
+# NFR-09: build multiplataforma, tests del parser y linting en cada commit.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run fixtures
+      - run: npm test
+      - run: npm run build
+      - name: E2E (Playwright + Electron)
+        run: xvfb-run -a npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+
+  package-linux:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder --linux
+      - name: Verificar tamaño del artefacto (NFR-06 ≤150 MB)
+        run: |
+          for f in release/*.AppImage; do
+            size=$(stat -c%s "$f")
+            echo "$f: $((size / 1024 / 1024)) MB"
+            [ "$size" -le $((150 * 1024 * 1024)) ] || exit 1
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+
+  package-macos:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Sin firma en CI: exige CSC_LINK/CSC_KEY_PASSWORD + notarización para release.
+      - run: npx electron-builder --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-packages
+          path: |
+            release/*.dmg
+            release/*.zip

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src data: about:; script-src 'self'" />
+  <title>MSG Viewer</title>
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- UI-02: panel de cabecera -->
+    <header id="header" hidden>
+      <div class="header-top">
+        <div class="meta">
+          <h1 id="subject"></h1>
+          <div id="signature-badge" class="badge" hidden></div>
+          <table id="meta-table" aria-label="Metadatos del mensaje"></table>
+        </div>
+        <!-- UI-02: barra de acciones -->
+        <nav id="actions" class="actions" aria-label="Acciones">
+          <button id="btn-export-pdf" class="btn" data-shortcut="mod+P"></button>
+          <button id="btn-export-eml" class="btn" data-shortcut="mod+Shift+E"></button>
+          <button id="btn-export-png" class="btn" data-shortcut="mod+Shift+P"></button>
+          <button id="btn-open" class="btn primary" data-shortcut="mod+O"></button>
+        </nav>
+      </div>
+      <!-- UI-02: chips de adjuntos -->
+      <div id="attachments" class="attachments" hidden>
+        <div class="attachment-row" id="attachment-row" role="list"></div>
+      </div>
+    </header>
+
+    <!-- FR-04: estado vacío con drag & drop -->
+    <section id="empty-state" class="empty-state">
+      <div class="drop-zone" id="drop-zone">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.2" aria-hidden="true">
+          <rect x="2" y="5" width="20" height="14" rx="2"/>
+          <path d="m2 7 10 6L22 7"/>
+        </svg>
+        <h2 id="welcome-title"></h2>
+        <p id="welcome-hint"></p>
+        <p id="welcome-or" class="muted"></p>
+        <button id="btn-welcome-open" class="btn primary"></button>
+      </div>
+    </section>
+
+    <!-- FR-05: error descriptivo, la app sigue operativa -->
+    <section id="error-state" class="error-state" hidden>
+      <div class="error-card" role="alert">
+        <h2 id="error-title"></h2>
+        <p id="error-message"></p>
+        <p id="error-detail" class="muted"></p>
+        <button id="btn-error-open" class="btn primary"></button>
+      </div>
+    </section>
+
+    <!-- UI-03: área de visualización -->
+    <main id="viewer" hidden>
+      <!-- allow-same-origin SIN allow-scripts: el contenido sigue inerte
+           (FR-08: sin scripts, sanitizado, CSP), pero el padre puede adjuntar
+           los listeners de drag & drop al documento interno (FR-02b). -->
+      <iframe id="body-frame" sandbox="allow-same-origin" title="Cuerpo del mensaje"></iframe>
+    </main>
+
+    <!-- FR-13: diálogo PNG demasiado alto -->
+    <dialog id="png-dialog">
+      <h3 id="png-dialog-title"></h3>
+      <p id="png-dialog-body"></p>
+      <div class="dialog-actions">
+        <button id="btn-png-cancel" class="btn"></button>
+        <button id="btn-png-truncate" class="btn primary"></button>
+      </div>
+    </dialog>
+
+    <!-- UI-06: toasts -->
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

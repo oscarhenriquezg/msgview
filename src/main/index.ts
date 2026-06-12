@@ -1,0 +1,538 @@
+import { rmSync } from 'node:fs';
+import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
+import { basename, extname, join } from 'node:path';
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell } from 'electron';
+import type {
+  AttachmentSaveRequest,
+  AttachmentSaveResult,
+  ExportRequest,
+  ExportResult,
+  LoadResult,
+  MsgDocument
+} from '@shared/types';
+import { MAX_PNG_HEIGHT } from '@shared/types';
+import {
+  exportEml,
+  exportPdf,
+  exportPng,
+  exportPngToClipboard,
+  getPrintableHtml,
+  measurePngHeight,
+  printDocument
+} from './export/exporter';
+import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled } from './menu';
+import { MAX_EMBEDDED_DEPTH } from './parser/limits';
+import { MsgAdapter } from './parser/MsgAdapter';
+import { parseBytes, parseFile, shutdownParser } from './parsing';
+
+/**
+ * Proceso main (§7.3): única zona con acceso a disco y diálogos nativos.
+ * Cada ventana tiene su propio documento (los .msg anidados se abren en
+ * ventana nueva, OBJ-S2); la ventana principal mantiene FR-03: un archivo
+ * abierto desde el SO reemplaza su contenido.
+ */
+
+interface WindowDocument {
+  document: MsgDocument;
+  /** Buffer original para extraer adjuntos / EML bajo demanda. */
+  buffer: Buffer;
+  /** Profundidad de anidado de este documento (OBJ-S2). */
+  embeddedDepth: number;
+}
+
+/** Documento activo por webContents.id. */
+const docs = new Map<number, WindowDocument>();
+/** Directorios temporales creados por "Abrir adjunto"; se purgan al salir. */
+const tempDirs = new Set<string>();
+let mainWindow: BrowserWindow | null = null;
+/** Ruta recibida (argv / open-file) antes de que la ventana esté lista. */
+let pendingPath: string | null = null;
+
+// Tests E2E: userData propio para no colisionar con una instancia en uso
+// (el lock de instancia única vive en userData).
+const customUserData = process.env['MSG_VIEWER_USER_DATA'];
+if (customUserData) app.setPath('userData', customUserData);
+
+// FR-03: instancia única; la segunda invocación entrega su argv a la primera.
+const locked = app.requestSingleInstanceLock();
+if (!locked) {
+  app.quit();
+} else {
+  bootstrap();
+}
+
+function bootstrap(): void {
+  // Render por software: evita el crash del proceso GPU en sesiones
+  // Wayland/Vulkan problemáticas y reduce huella de memoria (NFR-02).
+  app.disableHardwareAcceleration();
+
+  // macOS entrega rutas por evento open-file, incluso antes de ready (FR-01).
+  app.on('open-file', (event, path) => {
+    event.preventDefault();
+    openInMainWindow(path);
+  });
+
+  app.on('second-instance', (_event, argv, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+    const path = msgPathFromArgv(argv, workingDirectory);
+    if (path) openInMainWindow(path);
+  });
+
+  // El menú habilita exportaciones según el documento de la ventana enfocada.
+  app.on('browser-window-focus', (_event, win) => {
+    setExportEnabled(docs.has(win.webContents.id));
+  });
+
+  protocol.registerSchemesAsPrivileged([
+    { scheme: 'msgprint', privileges: { standard: true, secure: true } }
+  ]);
+
+  void app.whenReady().then(() => {
+    setupNetworkBlocking();
+    // Sirve el documento imprimible desde memoria (sin temporales, NFR-04).
+    protocol.handle('msgprint', () =>
+      new Response(getPrintableHtml(), {
+        headers: { 'content-type': 'text/html; charset=utf-8' }
+      })
+    );
+    installMenu();
+    registerIpc();
+    mainWindow = createAppWindow(true);
+
+    const path = msgPathFromArgv(process.argv, process.cwd());
+    if (path) pendingPath = path;
+  });
+
+  app.on('window-all-closed', () => {
+    shutdownParser();
+    app.quit(); // Sin procesos residentes (NFR-02), también en macOS.
+  });
+
+  // Limpieza de los temporales de "Abrir adjunto" (NFR-03: nada persistente).
+  app.on('will-quit', () => {
+    for (const dir of tempDirs) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // mejor esfuerzo: el SO purga su tmp igualmente
+      }
+    }
+  });
+}
+
+/**
+ * NFR-03: prohibición de tráfico saliente en capa de sesión. Solo se admite
+ * el servidor de desarrollo de Vite cuando existe (modo dev).
+ */
+function setupNetworkBlocking(): void {
+  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+    const url = details.url;
+    const allowed =
+      url.startsWith('file://') ||
+      url.startsWith('data:') ||
+      url.startsWith('msgprint://') ||
+      url.startsWith('devtools://') ||
+      (devUrl !== undefined && (url.startsWith(devUrl) || url.startsWith('ws://localhost')));
+    callback({ cancel: !allowed });
+  });
+}
+
+function createAppWindow(isMain: boolean): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1100,
+    height: 800,
+    minWidth: 640,
+    minHeight: 480,
+    show: false,
+    icon: APP_ICON_PATH,
+    webPreferences: {
+      preload: join(import.meta.dirname, '../preload/index.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false // el preload necesita webUtils; el renderer sigue aislado
+    }
+  });
+
+  win.once('ready-to-show', () => win.show());
+  // En algunos compositores Wayland ready-to-show no llega a dispararse;
+  // sin este fallback la ventana existiría pero nunca se mostraría.
+  setTimeout(() => {
+    if (!win.isDestroyed() && !win.isVisible()) {
+      console.warn('[msg-viewer] ready-to-show no llegó; mostrando ventana por fallback');
+      win.show();
+    }
+  }, 1200);
+
+  installContextMenu(win);
+
+  const wcId = win.webContents.id;
+  win.on('closed', () => {
+    docs.delete(wcId);
+    if (isMain) mainWindow = null;
+  });
+
+  // Tras recarga o en ventanas nuevas, el renderer recupera su documento
+  // por pull (get-current-document); nada se empuja antes de ese pull,
+  // que es la señal inequívoca de que sus listeners ya existen.
+
+  // Diagnóstico + reintento: una carga inicial fallida (p. ej. el dev server
+  // de Vite aún calentando, o un fallo transitorio de red local) dejaría una
+  // ventana en blanco permanente.
+  let failures = 0;
+  win.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (!isMainFrame) return;
+    failures++;
+    console.warn(`[msg-viewer] did-fail-load code=${code} ${desc} url=${url}`);
+    if (win.isDestroyed()) return;
+    if (failures === 1) {
+      setTimeout(() => {
+        if (!win.isDestroyed()) void loadRenderer(win);
+      }, 400);
+    } else if (failures === 2 && process.env['ELECTRON_RENDERER_URL']) {
+      // Dev server caído (p. ej. proceso huérfano): mejor la build local
+      // que una ventana en blanco.
+      console.warn('[msg-viewer] dev server inaccesible; usando build local');
+      void win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
+    }
+  });
+
+  void loadRenderer(win);
+  return win;
+}
+
+function loadRenderer(win: BrowserWindow): Promise<void> {
+  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  return devUrl
+    ? win.loadURL(devUrl)
+    : win.loadFile(join(import.meta.dirname, '../renderer/index.html'));
+}
+
+function msgPathFromArgv(argv: string[], cwd: string): string | null {
+  const candidate = argv
+    .slice(1)
+    .find((a) => !a.startsWith('-') && a.toLowerCase().endsWith('.msg'));
+  if (!candidate) return null;
+  return candidate.startsWith('/') ? candidate : join(cwd, candidate);
+}
+
+function openInMainWindow(path: string): void {
+  if (mainWindow) {
+    void openDocument(path, mainWindow);
+  } else {
+    pendingPath = path;
+  }
+}
+
+/** Carga + parseo en worker y entrega a la ventana indicada. */
+async function openDocument(filePath: string, win: BrowserWindow): Promise<LoadResult> {
+  const result = await parseFile(filePath);
+  if (result.ok) {
+    try {
+      docs.set(win.webContents.id, {
+        document: result.document,
+        buffer: await readFile(filePath),
+        embeddedDepth: 0
+      });
+    } catch (e) {
+      const failed: LoadResult = {
+        ok: false,
+        error: { code: 'not-found', detail: e instanceof Error ? e.message : String(e) }
+      };
+      win.webContents.send('document-loaded', failed);
+      return failed;
+    }
+    win.setTitle(`${basename(filePath)} — MSG Viewer`);
+  }
+  setExportEnabled(docs.has(win.webContents.id));
+  win.webContents.send('document-loaded', result);
+  return result;
+}
+
+function registerIpc(): void {
+  ipcMain.handle('dialog:open', async (e): Promise<LoadResult | null> => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win) return null;
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      filters: [{ name: 'Mensajes de Outlook', extensions: ['msg'] }],
+      properties: ['openFile']
+    });
+    const first = filePaths[0];
+    if (canceled || !first) return null;
+    return openDocument(first, win);
+  });
+
+  ipcMain.handle('open-path', (e, path: string): Promise<LoadResult> => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || typeof path !== 'string' || !path) {
+      return Promise.resolve({ ok: false, error: { code: 'not-found' } });
+    }
+    return openDocument(path, win);
+  });
+
+  // OBJ-S2: abre un .msg incrustado en una ventana nueva (comparación lado a lado).
+  ipcMain.handle('open-embedded', (e, attachmentId: number) =>
+    openEmbedded(e.sender.id, attachmentId)
+  );
+
+  // Clic en un chip de adjunto: menú nativo Abrir / Guardar (es/en).
+  ipcMain.on('attachment-menu', (e, attachmentId: number) => {
+    const state = docs.get(e.sender.id);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const meta = state?.document.attachments.find((a) => a.id === attachmentId);
+    if (!state || !win || !meta) return;
+    const es = app.getLocale().startsWith('es');
+
+    const items: Electron.MenuItemConstructorOptions[] = [];
+    if (meta.isEmbeddedMsg) {
+      items.push({
+        label: es ? 'Abrir mensaje' : 'Open message',
+        click: () => void openEmbedded(e.sender.id, attachmentId)
+      });
+    } else {
+      items.push({
+        label: es ? 'Abrir' : 'Open',
+        click: () => void openAttachmentInTemp(win, state, attachmentId)
+      });
+    }
+    items.push({
+      label: es ? 'Guardar como…' : 'Save as…',
+      click: () => void saveSingleAttachment(win, state, attachmentId)
+    });
+    Menu.buildFromTemplate(items).popup({ window: win });
+  });
+
+  // FR-10: extracción de adjuntos solo por acción explícita (NFR-03).
+  ipcMain.handle(
+    'attachments:save',
+    async (e, req: AttachmentSaveRequest): Promise<AttachmentSaveResult> => {
+      const state = docs.get(e.sender.id);
+      const win = BrowserWindow.fromWebContents(e.sender);
+      if (!state || !win) return { ok: false, reason: 'error', detail: 'Sin documento' };
+      const targets =
+        req.ids && req.ids.length > 0
+          ? state.document.attachments.filter((a) => req.ids!.includes(a.id))
+          : state.document.attachments.filter((a) => !a.isInline);
+      if (targets.length === 0) return { ok: false, reason: 'error', detail: 'Sin adjuntos' };
+
+      try {
+        if (targets.length === 1) {
+          const target = targets[0]!;
+          const { canceled, filePath } = await dialog.showSaveDialog(win, {
+            defaultPath: target.fileName
+          });
+          if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
+          const data = MsgAdapter.getAttachmentContent(state.buffer, target.id);
+          if (!data) return { ok: false, reason: 'error', detail: 'Adjunto ilegible' };
+          await writeFile(filePath, data.content);
+          return { ok: true, savedPaths: [filePath] };
+        }
+
+        // "Guardar todos": carpeta elegida por el usuario (FR-10).
+        const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+          properties: ['openDirectory', 'createDirectory']
+        });
+        const dir = filePaths[0];
+        if (canceled || !dir) return { ok: false, reason: 'cancelled' };
+        await mkdir(dir, { recursive: true });
+        const saved: string[] = [];
+        for (const target of targets) {
+          const data = MsgAdapter.getAttachmentContent(state.buffer, target.id);
+          if (!data) continue;
+          const path = join(dir, uniqueName(target.fileName, saved));
+          await writeFile(path, data.content);
+          saved.push(path);
+        }
+        return { ok: true, savedPaths: saved };
+      } catch (e2) {
+        return { ok: false, reason: 'error', detail: e2 instanceof Error ? e2.message : String(e2) };
+      }
+    }
+  );
+
+  // FR-11/12/13: botón → "Guardar como" → generación directa.
+  ipcMain.handle('export', async (e, req: ExportRequest): Promise<ExportResult> => {
+    const state = docs.get(e.sender.id);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!state || !win) return { ok: false, reason: 'error', detail: 'Sin documento' };
+    const doc = state.document;
+    const base = (doc.metadata.subject || basename(doc.sourcePath, '.msg') || 'mensaje')
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .slice(0, 120);
+
+    // PNG: comprobar el límite de altura antes de pedir destino (FR-13).
+    if (req.format === 'png' && !req.acceptTruncation) {
+      const height = await measurePngHeight(doc);
+      if (height !== null && height > MAX_PNG_HEIGHT) {
+        return { ok: false, reason: 'png-too-tall', contentHeight: height };
+      }
+    }
+
+    // PNG al portapapeles: sin diálogo de guardado.
+    if (req.format === 'png' && req.target === 'clipboard') {
+      return exportPngToClipboard(doc, req.acceptTruncation ?? false);
+    }
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: `${base}.${req.format}`,
+      filters: [{ name: req.format.toUpperCase(), extensions: [req.format] }]
+    });
+    if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
+
+    switch (req.format) {
+      case 'pdf':
+        return exportPdf(doc, filePath);
+      case 'eml':
+        return exportEml(state.buffer, filePath);
+      case 'png':
+        return exportPng(doc, filePath, req.acceptTruncation ?? false);
+    }
+  });
+
+  // Botón PNG: elegir entre guardar a archivo o copiar al portapapeles.
+  ipcMain.handle('png-menu', (e): Promise<'save' | 'copy' | null> => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || !docs.has(e.sender.id)) return Promise.resolve(null);
+    const es = app.getLocale().startsWith('es');
+    return new Promise((resolve) => {
+      Menu.buildFromTemplate([
+        { label: es ? 'Guardar como…' : 'Save as…', click: () => resolve('save') },
+        {
+          label: es ? 'Copiar al portapapeles' : 'Copy to clipboard',
+          click: () => resolve('copy')
+        }
+      ]).popup({
+        window: win,
+        // El callback de cierre llega antes que el click; se cede el turno.
+        callback: () => setTimeout(() => resolve(null), 150)
+      });
+    });
+  });
+
+  // FR adicional: impresión con diálogo del sistema (menú Archivo).
+  ipcMain.handle('print', (e): Promise<ExportResult> => {
+    const state = docs.get(e.sender.id);
+    if (!state) return Promise.resolve({ ok: false, reason: 'error', detail: 'Sin documento' });
+    return printDocument(state.document);
+  });
+
+  ipcMain.on('show-in-folder', (_e, path: string) => {
+    if (typeof path === 'string' && path) shell.showItemInFolder(path);
+  });
+
+  ipcMain.handle('get-locale', () => app.getLocale());
+
+  ipcMain.handle('get-current-document', (e): MsgDocument | null => {
+    // El pull marca el renderer como listo: es el momento seguro de
+    // procesar la ruta recibida por argv/open-file antes de la ventana.
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win && win === mainWindow && pendingPath) {
+      const path = pendingPath;
+      pendingPath = null;
+      void openDocument(path, win); // el resultado llegará por push
+      return null;
+    }
+    return docs.get(e.sender.id)?.document ?? null;
+  });
+}
+
+/** OBJ-S2: parsea el .msg incrustado y lo muestra en una ventana nueva. */
+async function openEmbedded(senderWcId: number, attachmentId: number): Promise<LoadResult> {
+  const parent = docs.get(senderWcId);
+  if (!parent) return { ok: false, error: { code: 'not-found' } };
+  if (parent.embeddedDepth >= MAX_EMBEDDED_DEPTH) {
+    return { ok: false, error: { code: 'parse-error', detail: 'Profundidad máxima de anidado' } };
+  }
+  const meta = parent.document.attachments.find((a) => a.id === attachmentId);
+  if (!meta?.isEmbeddedMsg) return { ok: false, error: { code: 'not-found' } };
+  const inner = MsgAdapter.getAttachmentContent(parent.buffer, attachmentId);
+  if (!inner) return { ok: false, error: { code: 'parse-error', detail: 'Adjunto ilegible' } };
+
+  const virtualPath = `${parent.document.sourcePath} › ${meta.fileName}`;
+  const result = await parseBytes(inner.content, virtualPath);
+  if (!result.ok) return result;
+
+  const win = createAppWindow(false);
+  docs.set(win.webContents.id, {
+    document: result.document,
+    buffer: Buffer.from(inner.content),
+    embeddedDepth: parent.embeddedDepth + 1
+  });
+  win.setTitle(`${meta.fileName} — MSG Viewer`);
+  // La ventana nueva recoge su documento vía get-current-document al iniciar.
+  return result;
+}
+
+/**
+ * "Abrir" un adjunto: extracción a un temporal propio (acción explícita del
+ * usuario, FR-10/NFR-03) + apertura con la app predeterminada del SO.
+ * Los temporales se purgan al salir (will-quit).
+ */
+async function openAttachmentInTemp(
+  win: BrowserWindow,
+  state: WindowDocument,
+  attachmentId: number
+): Promise<void> {
+  const es = app.getLocale().startsWith('es');
+  const data = MsgAdapter.getAttachmentContent(state.buffer, attachmentId);
+  if (!data) {
+    notify(win, es ? 'Adjunto ilegible' : 'Unreadable attachment', undefined, true);
+    return;
+  }
+  try {
+    const dir = await mkdtemp(join(app.getPath('temp'), 'msg-viewer-'));
+    tempDirs.add(dir);
+    const safeName = basename(data.fileName) || 'adjunto';
+    const filePath = join(dir, safeName);
+    await writeFile(filePath, data.content);
+    const errorMsg = await shell.openPath(filePath);
+    if (errorMsg) notify(win, errorMsg, undefined, true);
+  } catch (err) {
+    notify(win, err instanceof Error ? err.message : String(err), undefined, true);
+  }
+}
+
+/** "Guardar como…" de un único adjunto, con toast de confirmación (UI-06). */
+async function saveSingleAttachment(
+  win: BrowserWindow,
+  state: WindowDocument,
+  attachmentId: number
+): Promise<void> {
+  const es = app.getLocale().startsWith('es');
+  const meta = state.document.attachments.find((a) => a.id === attachmentId);
+  if (!meta) return;
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    defaultPath: meta.fileName
+  });
+  if (canceled || !filePath) return;
+  const data = MsgAdapter.getAttachmentContent(state.buffer, attachmentId);
+  if (!data) {
+    notify(win, es ? 'Adjunto ilegible' : 'Unreadable attachment', undefined, true);
+    return;
+  }
+  try {
+    await writeFile(filePath, data.content);
+    notify(win, es ? 'Guardado' : 'Saved', filePath);
+  } catch (err) {
+    notify(win, err instanceof Error ? err.message : String(err), undefined, true);
+  }
+}
+
+/** Toast en el renderer de la ventana indicada (UI-06). */
+function notify(win: BrowserWindow, message: string, path?: string, isError = false): void {
+  win.webContents.send('toast', { message, path, isError });
+}
+
+function uniqueName(fileName: string, saved: string[]): string {
+  const taken = new Set(saved.map((p) => basename(p)));
+  if (!taken.has(fileName)) return fileName;
+  const ext = extname(fileName);
+  const stem = fileName.slice(0, fileName.length - ext.length);
+  for (let i = 2; ; i++) {
+    const candidate = `${stem} (${i})${ext}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}

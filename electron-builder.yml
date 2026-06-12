@@ -1,0 +1,51 @@
+# Empaquetado (FR-01, NFR-05/06). Targets: AppImage primario + deb/rpm (Linux),
+# dmg/zip universal (macOS; firma y notarización requieren entorno Apple).
+appId: io.github.oscarhenriquez.msgviewer
+productName: MSG Viewer
+copyright: © 2026 Oscar Henríquez
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**
+  - package.json
+  - build/icon.png # icono de ventana y del diálogo Acerca de
+
+# Sin asar: el worker de parsing (worker_threads) se carga con el loader ESM
+# de Node, que no puede leer dentro de archivos .asar.
+asar: false
+
+# FR-01: asociación con la extensión .msg / MIME type.
+fileAssociations:
+  - ext: msg
+    name: Outlook Message
+    description: Mensaje de Microsoft Outlook
+    mimeType: application/vnd.ms-outlook
+    role: Viewer
+
+linux:
+  target:
+    - AppImage
+    - deb
+    - rpm
+  category: Office
+  desktop:
+    entry:
+      StartupWMClass: msg-viewer
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: universal
+    - target: zip
+      arch: universal
+  darkModeSupport: true
+  minimumSystemVersion: '12.0'
+  # Firma/notarización: definir CSC_LINK / APPLE_ID en el entorno de build macOS.
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}

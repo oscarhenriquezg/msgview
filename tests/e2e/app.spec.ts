@@ -1,0 +1,163 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
+
+/**
+ * E2E sobre la app construida (out/) con el corpus de fixtures.
+ * Requiere `npm run build && npm run fixtures` previos.
+ */
+
+const ROOT = join(import.meta.dirname, '..', '..');
+const FIXTURES = join(ROOT, 'tests', 'fixtures');
+
+let app: ElectronApplication;
+let page: Page;
+
+async function launch(...args: string[]): Promise<void> {
+  // userData aislado: no colisiona con una instancia del usuario en marcha.
+  const userData = mkdtempSync(join(tmpdir(), 'msgviewer-userdata-'));
+  app = await electron.launch({
+    args: ['.', ...args],
+    cwd: ROOT,
+    env: { ...process.env, MSG_VIEWER_USER_DATA: userData }
+  });
+  page = await app.firstWindow();
+}
+
+test.afterEach(async () => {
+  await app?.close();
+});
+
+/** Sustituye los diálogos nativos para que devuelvan una ruta fija. */
+async function stubSaveDialog(filePath: string): Promise<void> {
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+  }, filePath);
+}
+
+test('arranque sin archivo muestra el estado de bienvenida (FR-04)', async () => {
+  await launch();
+  await expect(page.locator('#drop-zone')).toBeVisible();
+  await expect(page.locator('#btn-welcome-open')).toBeVisible();
+});
+
+test('apertura por argv renderiza metadatos, cuerpo y adjuntos (FR-02a, FR-06)', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await expect(page.locator('#meta-table')).toContainText('ana.perez@example.com');
+  await expect(page.locator('#meta-table')).toContainText('oscar@example.com');
+  await expect(page.locator('.chip')).toHaveCount(2);
+
+  const frame = page.frameLocator('#body-frame');
+  await expect(frame.locator('h1')).toHaveText('Informe');
+});
+
+test('correo hostil: sin ejecución de scripts en el iframe (criterio 2, FR-08)', async () => {
+  await launch(join(FIXTURES, 'hostile-script.msg'));
+  await expect(page.locator('#subject')).toHaveText('XSS attempt');
+
+  const frame = page.frame({ url: /about:srcdoc/ }) ?? page.mainFrame().childFrames()[0];
+  expect(frame).toBeTruthy();
+  const pwned = await frame!.evaluate(() => (window as { PWNED?: boolean }).PWNED);
+  expect(pwned).toBeUndefined();
+  // El contenido visible sí se muestra (degradación con gracia).
+  await expect(page.frameLocator('#body-frame').locator('p')).toContainText('Hola');
+});
+
+test('imagen inline cid: renderizada como data: URI (FR-09)', async () => {
+  await launch(join(FIXTURES, 'inline-image.msg'));
+  const img = page.frameLocator('#body-frame').locator('img');
+  await expect(img).toHaveAttribute('src', /^data:image\/png;base64/);
+});
+
+test('archivo corrupto muestra error descriptivo y la app sigue operativa (FR-05)', async () => {
+  await launch(join(FIXTURES, 'random-bytes.msg'));
+  await expect(page.locator('#error-state')).toBeVisible();
+  await expect(page.locator('#error-message')).toContainText('CFBF');
+  await expect(page.locator('#btn-error-open')).toBeEnabled();
+});
+
+test('mensaje cifrado S/MIME informa sin crash (FR-05, §1.2)', async () => {
+  await launch(join(FIXTURES, 'smime-encrypted.msg'));
+  await expect(page.locator('#error-state')).toBeVisible();
+  await expect(page.locator('#error-message')).toContainText(/cifrado|encrypted/i);
+});
+
+test.describe('exportaciones (FR-11/12/13, criterio 4)', () => {
+  let dir: string;
+  test.beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'msgviewer-e2e-'));
+  });
+  test.afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('exportar PDF produce un PDF válido', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    const out = join(dir, 'mensaje.pdf');
+    await stubSaveDialog(out);
+    await page.locator('#btn-export-pdf').click();
+    await expect(page.locator('.toast')).toContainText('PDF');
+    expect(readFileSync(out).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  test('exportar EML produce MIME con cabeceras estándar', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    const out = join(dir, 'mensaje.eml');
+    await stubSaveDialog(out);
+    await page.locator('#btn-export-eml').click();
+    await expect(page.locator('.toast')).toContainText('EML');
+    const eml = readFileSync(out, 'utf-8');
+    expect(eml).toContain('From: ');
+    expect(eml).toContain('Subject: ');
+    expect(eml).toContain('MIME-Version: 1.0');
+  });
+
+  test('exportar PNG produce una imagen PNG', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    const out = join(dir, 'mensaje.png');
+    await stubSaveDialog(out);
+    // El botón PNG abre un menú nativo (guardar/copiar); se fuerza "guardar".
+    await app.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler('png-menu');
+      ipcMain.handle('png-menu', () => 'save');
+    });
+    await page.locator('#btn-export-png').click();
+    await expect(page.locator('.toast')).toContainText('PNG', { timeout: 20_000 });
+    const sig = readFileSync(out).subarray(0, 8);
+    expect([...sig]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  });
+
+  test('guardar adjunto conserva integridad binaria (criterio 3)', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    const out = join(dir, 'datos.csv');
+    await stubSaveDialog(out);
+    await page.locator('.chip', { hasText: 'datos.csv' }).locator('button').last().click();
+    await expect(page.locator('.toast')).toBeVisible();
+    expect(readFileSync(out, 'utf-8')).toBe('a;b;c\n1;2;3\n');
+  });
+});
+
+test('Ver→Recargar conserva el documento (pull get-current-document)', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.webContents.reload()
+  );
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2', { timeout: 10000 });
+  await expect(page.locator('#empty-state')).toBeHidden();
+});
+
+test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
+  await launch(join(FIXTURES, 'hostile-script.msg'));
+  await expect(page.locator('#subject')).toHaveText('XSS attempt');
+  // La petición del tracker debe haberse cancelado en capa de sesión:
+  // ninguna imagen del documento apunta a un host remoto.
+  const remoteImgs = await page
+    .frameLocator('#body-frame')
+    .locator('img')
+    .evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src).filter((s) => /^https?:/.test(s)));
+  expect(remoteImgs).toEqual([]);
+});

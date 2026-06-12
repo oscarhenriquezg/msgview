@@ -1,0 +1,15 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.DS_Store
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+tests/fixtures/real/
+tests/fixtures/*.msg
+tests/fixtures/*.eml
+.claude/
+*.rpm
