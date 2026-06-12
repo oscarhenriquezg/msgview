@@ -269,14 +269,21 @@ function renderBody(sanitizedHtml: string): void {
         el.linkbar.textContent = '';
       }
     });
-    // findInPage puede dejar el foco dentro del iframe: Esc y Ctrl+F deben
-    // seguir funcionando desde ahí.
+    // Esc y Ctrl+F también con el foco dentro del iframe.
     doc.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !el.findbar.hidden) closeFindBar();
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         openFindBar();
       }
+    });
+    // Advertencia anti-phishing: salir del visor requiere confirmación.
+    doc.addEventListener('click', (e) => {
+      const a = (e.target as Element | null)?.closest?.('a[href]');
+      if (!a) return;
+      e.preventDefault();
+      const href = a.getAttribute('href') ?? '';
+      if (/^(https?:|mailto:)/i.test(href)) api.openExternal(href);
     });
   };
   el.bodyFrame.srcdoc = `<!DOCTYPE html>
@@ -288,6 +295,8 @@ function renderBody(sanitizedHtml: string): void {
 <style>
   body { margin: 16px; background: #fff; color: #1a1a1a;
          font-family: system-ui, sans-serif; font-size: 14px; }
+  mark.__find { background: #ffe066; color: inherit; padding: 0; }
+  mark.__find.__find-active { background: #ff9632; outline: 2px solid #ff9632; }
 </style>
 </head>
 <body>${sanitizedHtml}</body>
@@ -382,6 +391,8 @@ function askPngTruncation(contentHeight: number): void {
 // ---------------------------------------------------------------------------
 
 let findDebounce: ReturnType<typeof setTimeout> | undefined;
+let findMarks: HTMLElement[] = [];
+let findActive = -1;
 
 function openFindBar(): void {
   if (el.viewer.hidden) return;
@@ -393,7 +404,75 @@ function openFindBar(): void {
 function closeFindBar(): void {
   el.findbar.hidden = true;
   el.findCount.textContent = '';
-  api.stopFind();
+  clearSearch();
+}
+
+/** Deshace los <mark> dejando el DOM del cuerpo como estaba. */
+function clearSearch(): void {
+  const doc = el.bodyFrame.contentDocument;
+  findMarks = [];
+  findActive = -1;
+  if (!doc) return;
+  for (const mark of Array.from(doc.querySelectorAll('mark.__find'))) {
+    const parent = mark.parentNode;
+    if (!parent) continue;
+    parent.replaceChild(doc.createTextNode(mark.textContent ?? ''), mark);
+    parent.normalize();
+  }
+}
+
+/**
+ * Búsqueda propia en el cuerpo: envuelve coincidencias en <mark> y desplaza
+ * la activa a la vista (el findInPage nativo no garantiza el scroll dentro
+ * del iframe). Coincidencias por nodo de texto, sin cruzar etiquetas.
+ */
+function searchInBody(query: string): void {
+  clearSearch();
+  const doc = el.bodyFrame.contentDocument;
+  if (!doc || !query) {
+    el.findCount.textContent = '';
+    return;
+  }
+  const needle = query.toLowerCase();
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) textNodes.push(n as Text);
+
+  for (const node of textNodes) {
+    const text = node.textContent ?? '';
+    const lower = text.toLowerCase();
+    let from = 0;
+    let idx = lower.indexOf(needle, from);
+    if (idx === -1) continue;
+    const frag = doc.createDocumentFragment();
+    let last = 0;
+    while (idx !== -1 && findMarks.length < 5000) {
+      frag.append(doc.createTextNode(text.slice(last, idx)));
+      const mark = doc.createElement('mark');
+      mark.className = '__find';
+      mark.textContent = text.slice(idx, idx + query.length);
+      frag.append(mark);
+      findMarks.push(mark);
+      last = idx + query.length;
+      from = last;
+      idx = lower.indexOf(needle, from);
+    }
+    frag.append(doc.createTextNode(text.slice(last)));
+    node.parentNode?.replaceChild(frag, node);
+  }
+  if (findMarks.length > 0) setActiveMatch(0);
+  else el.findCount.textContent = t('find.count', { a: 0, n: 0 });
+}
+
+/** Activa la coincidencia i, la resalta y la centra en el visor. */
+function setActiveMatch(i: number): void {
+  if (findMarks.length === 0) return;
+  if (findActive >= 0) findMarks[findActive]?.classList.remove('__find-active');
+  findActive = ((i % findMarks.length) + findMarks.length) % findMarks.length;
+  const mark = findMarks[findActive]!;
+  mark.classList.add('__find-active');
+  mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.findCount.textContent = t('find.count', { a: findActive + 1, n: findMarks.length });
 }
 
 function setupFindBar(): void {
@@ -410,31 +489,15 @@ function setupFindBar(): void {
   el.findInput.addEventListener('input', () => {
     clearTimeout(findDebounce);
     const text = el.findInput.value;
-    findDebounce = setTimeout(() => {
-      if (text) api.find(text);
-      else {
-        api.stopFind();
-        el.findCount.textContent = '';
-      }
-    }, 150);
+    findDebounce = setTimeout(() => searchInBody(text), 150);
   });
   el.findInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && el.findInput.value) {
-      api.findNext(el.findInput.value, !e.shiftKey);
-    } else if (e.key === 'Escape') {
-      closeFindBar();
-    }
+    if (e.key === 'Enter') setActiveMatch(findActive + (e.shiftKey ? -1 : 1));
+    else if (e.key === 'Escape') closeFindBar();
   });
-  $('find-next').addEventListener('click', () => {
-    if (el.findInput.value) api.findNext(el.findInput.value, true);
-  });
-  $('find-prev').addEventListener('click', () => {
-    if (el.findInput.value) api.findNext(el.findInput.value, false);
-  });
+  $('find-next').addEventListener('click', () => setActiveMatch(findActive + 1));
+  $('find-prev').addEventListener('click', () => setActiveMatch(findActive - 1));
   $('find-close').addEventListener('click', closeFindBar);
-  api.onFindResult((r) => {
-    el.findCount.textContent = t('find.count', { a: r.active, n: r.matches });
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -541,16 +604,32 @@ async function init(): Promise<void> {
   $('welcome-hint').textContent = t('welcome.hint');
   $('welcome-or').textContent = t('welcome.or');
   $('btn-welcome-open').textContent = t('welcome.open');
-  $('btn-open').textContent = t('actions.open');
+  $('btn-save-copy').textContent = `💾 ${t('actions.saveAs')}`;
   $('btn-export-pdf').textContent = `📄 ${t('actions.exportPdf')}`;
   $('btn-export-eml').textContent = `✉️ ${t('actions.exportEml')}`;
   $('btn-export-png').textContent = `🖼️ ${t('actions.exportPng')}`;
+  $('btn-find').title = t('actions.find');
+  $('btn-zoom-in').title = t('actions.zoomIn');
+  $('btn-zoom-out').title = t('actions.zoomOut');
+  $('btn-about').title = t('actions.about');
   $('btn-png-truncate').textContent = t('png.tooTall.truncate');
   $('btn-png-cancel').textContent = t('png.tooTall.cancel');
   $('btn-error-open').textContent = t('actions.open');
 
-  $('btn-open').addEventListener('click', () => void openDialog());
   $('btn-welcome-open').addEventListener('click', () => void openDialog());
+  $('btn-save-copy').addEventListener('click', () => {
+    void api.saveCopy().then((r) => {
+      if (r.ok) toast(t('toast.saved'), r.filePath);
+      else if (r.reason === 'error') toast(`${t('toast.saveError')}: ${r.detail ?? ''}`, undefined, true);
+    });
+  });
+  $('btn-find').addEventListener('click', () => {
+    if (el.findbar.hidden) openFindBar();
+    else closeFindBar();
+  });
+  $('btn-zoom-in').addEventListener('click', () => api.zoom(1));
+  $('btn-zoom-out').addEventListener('click', () => api.zoom(-1));
+  $('btn-about').addEventListener('click', () => api.showAbout());
   $('btn-error-open').addEventListener('click', () => void openDialog());
   $('btn-export-pdf').addEventListener('click', () => void exportDocument('pdf'));
   $('btn-export-eml').addEventListener('click', () => void exportDocument('eml'));

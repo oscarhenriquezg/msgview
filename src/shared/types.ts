@@ -117,11 +117,17 @@ export interface MsgViewerApi {
         | { type: 'copy-meta'; as: 'text' | 'json' }
     ) => void
   ): void;
-  /** Búsqueda en el mensaje (findInPage nativo, cubre el iframe). */
-  find(text: string): void;
-  findNext(text: string, forward: boolean): void;
-  stopFind(): void;
-  onFindResult(cb: (r: { matches: number; active: number }) => void): void;
+  /** Guarda una copia del archivo original (.msg/.eml) en disco. */
+  saveCopy(): Promise<ExportResult>;
+  /** Zoom de la interfaz: delta en niveles de Chromium (±0.5 por paso). */
+  zoom(delta: number): void;
+  /** Abre la ventana "Acerca de". */
+  showAbout(): void;
+  /**
+   * Solicita abrir una URL externa en el navegador del sistema; main
+   * muestra la advertencia de confianza antes de salir del visor.
+   */
+  openExternal(url: string): void;
   /** Menú nativo del botón PNG: guardar a archivo o copiar al portapapeles. */
   askPngAction(): Promise<'save' | 'copy' | null>;
   /** Imprime el documento con el diálogo de impresión del sistema. */

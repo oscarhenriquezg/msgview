@@ -53,5 +53,10 @@
   "bodySource.plaintext": "Plain text",
   "header.subject": "Subject",
   "find.count": "{a} of {n}",
-  "toast.metaCopied": "Metadata copied to clipboard"
+  "toast.metaCopied": "Metadata copied to clipboard",
+  "actions.saveAs": "Save as",
+  "actions.find": "Find in message (Ctrl+F)",
+  "actions.zoomIn": "Zoom in",
+  "actions.zoomOut": "Zoom out",
+  "actions.about": "About MSG Viewer"
 }

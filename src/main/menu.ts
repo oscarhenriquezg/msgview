@@ -129,7 +129,7 @@ function sendToFocused(action: MenuAction): void {
  * Acerca de: ventana propia (los diálogos nativos no permiten capturar
  * clics en el icono). El easter egg vive tras un clic en el icono.
  */
-function showAbout(parent: BrowserWindow | null): void {
+export function showAbout(parent: BrowserWindow | null): void {
   const s = L();
   const esc = (x: string) =>
     x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');

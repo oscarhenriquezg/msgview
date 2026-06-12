@@ -168,6 +168,35 @@ test('búsqueda en el mensaje (Ctrl+F) con contador', async () => {
   await expect(page.locator('#findbar')).toBeHidden();
 });
 
+test('clic en enlace: advertencia antes de salir del visor', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  // Acepta la advertencia y captura la URL que se abriría externamente.
+  await app.evaluate(({ dialog, shell }) => {
+    (globalThis as { __opened?: string }).__opened = '';
+    dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as never;
+    shell.openExternal = (async (url: string) => {
+      (globalThis as { __opened?: string }).__opened = url;
+    }) as never;
+  });
+  await page.frameLocator('#body-frame').locator('a', { hasText: 'Ver detalle' }).click();
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as { __opened?: string }).__opened))
+    .toBe('https://intranet.example.com/q2');
+});
+
+test('búsqueda propia desplaza hasta la coincidencia activa', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await page.keyboard.press('Control+f');
+  await page.locator('#find-input').fill('detalle');
+  await expect(page.locator('#find-count')).toContainText(/1 (de|of) 1/);
+  // La coincidencia queda marcada como activa dentro del iframe.
+  await expect(
+    page.frameLocator('#body-frame').locator('mark.__find-active')
+  ).toHaveText('detalle');
+});
+
 test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
   await launch(join(FIXTURES, 'hostile-script.msg'));
   await expect(page.locator('#subject')).toHaveText('XSS attempt');

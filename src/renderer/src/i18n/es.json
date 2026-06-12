@@ -53,5 +53,10 @@
   "bodySource.plaintext": "Texto plano",
   "header.subject": "Asunto",
   "find.count": "{a} de {n}",
-  "toast.metaCopied": "Metadatos copiados al portapapeles"
+  "toast.metaCopied": "Metadatos copiados al portapapeles",
+  "actions.saveAs": "Guardar como",
+  "actions.find": "Buscar en el mensaje (Ctrl+F)",
+  "actions.zoomIn": "Acercar",
+  "actions.zoomOut": "Alejar",
+  "actions.about": "Acerca de MSG Viewer"
 }

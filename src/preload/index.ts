@@ -25,12 +25,10 @@ const api: MsgViewerApi & { openDroppedFile(file: File): Promise<LoadResult> } =
     ipcRenderer.on('menu-action', (_event, action) => cb(action));
   },
   copyText: (text) => clipboard.writeText(text),
-  find: (text) => ipcRenderer.send('find', text),
-  findNext: (text, forward) => ipcRenderer.send('find-next', { text, forward }),
-  stopFind: () => ipcRenderer.send('find-stop'),
-  onFindResult: (cb) => {
-    ipcRenderer.on('find-result', (_event, r) => cb(r));
-  },
+  saveCopy: () => ipcRenderer.invoke('save-copy'),
+  zoom: (delta) => ipcRenderer.send('zoom', delta),
+  showAbout: () => ipcRenderer.send('show-about'),
+  openExternal: (url) => ipcRenderer.send('open-external', url),
   askPngAction: () => ipcRenderer.invoke('png-menu'),
   printDocument: () => ipcRenderer.invoke('print'),
   showAttachmentMenu: (attachmentId) => ipcRenderer.send('attachment-menu', attachmentId),

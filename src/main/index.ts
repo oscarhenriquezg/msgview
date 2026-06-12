@@ -20,7 +20,7 @@ import {
   measurePngHeight,
   printDocument
 } from './export/exporter';
-import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled } from './menu';
+import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled, showAbout } from './menu';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
 import { addRecent, clearRecents, existingRecents } from './recents';
@@ -169,14 +169,6 @@ function createAppWindow(isMain: boolean): BrowserWindow {
   }, 1200);
 
   installContextMenu(win);
-
-  // Resultados de búsqueda (Ctrl+F) hacia la barra del renderer.
-  win.webContents.on('found-in-page', (_e, result) => {
-    win.webContents.send('find-result', {
-      matches: result.matches,
-      active: result.activeMatchOrdinal
-    });
-  });
 
   const wcId = win.webContents.id;
   win.on('closed', () => {
@@ -451,15 +443,65 @@ function registerIpc(): void {
     return printDocument(state.document);
   });
 
-  // Búsqueda en página (Ctrl+F): findInPage cubre también el iframe.
-  ipcMain.on('find', (e, text: string) => {
-    if (typeof text === 'string' && text.length > 0) e.sender.findInPage(text);
+  // "Guardar como": copia del archivo original (.msg/.eml).
+  ipcMain.handle('save-copy', async (e): Promise<ExportResult> => {
+    const state = docs.get(e.sender.id);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!state || !win) return { ok: false, reason: 'error', detail: 'Sin documento' };
+    const suggested = basename(state.document.sourcePath) || 'mensaje.msg';
+    const { canceled, filePath } = await dialog.showSaveDialog(win, { defaultPath: suggested });
+    if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
+    try {
+      await writeFile(filePath, state.buffer);
+      return { ok: true, filePath };
+    } catch (err) {
+      return { ok: false, reason: 'error', detail: err instanceof Error ? err.message : String(err) };
+    }
   });
-  ipcMain.on('find-next', (e, args: { text: string; forward: boolean }) => {
-    if (args?.text) e.sender.findInPage(args.text, { findNext: true, forward: args.forward });
+
+  // Zoom de la interfaz (botones +/− de la barra).
+  ipcMain.on('zoom', (e, delta: number) => {
+    if (typeof delta !== 'number' || !Number.isFinite(delta)) return;
+    const level = e.sender.getZoomLevel() + Math.sign(delta) * 0.5;
+    e.sender.setZoomLevel(Math.max(-3, Math.min(3, level)));
   });
-  ipcMain.on('find-stop', (e) => {
-    e.sender.stopFindInPage('clearSelection');
+
+  ipcMain.on('show-about', (e) => {
+    showAbout(BrowserWindow.fromWebContents(e.sender));
+  });
+
+  // Advertencia anti-phishing al salir del visor (clic en un enlace).
+  ipcMain.on('open-external', (e, url: string) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || typeof url !== 'string') return;
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return;
+    }
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return;
+    const es = app.getLocale().startsWith('es');
+    void dialog
+      .showMessageBox(win, {
+        type: 'warning',
+        title: es ? 'Salir del visor' : 'Leaving the viewer',
+        message: es ? 'Vas a abrir un enlace externo' : 'You are about to open an external link',
+        detail:
+          (es
+            ? 'Esto saldrá del visor hacia:\n\n'
+            : 'This will leave the viewer and open:\n\n') +
+          url +
+          (es
+            ? '\n\nVerifica que la dirección es de confianza antes de continuar.'
+            : '\n\nMake sure you trust this address before continuing.'),
+        buttons: [es ? 'Cancelar' : 'Cancel', es ? 'Abrir en el navegador' : 'Open in browser'],
+        defaultId: 0,
+        cancelId: 0
+      })
+      .then(({ response }) => {
+        if (response === 1) void shell.openExternal(url);
+      });
   });
 
   ipcMain.on('show-in-folder', (_e, path: string) => {

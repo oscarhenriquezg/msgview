@@ -101,7 +101,7 @@ writeFileSync(join(outDir, 'html-basic.msg'), buildMsg({
   subject: 'Informe trimestral Q2',
   senderName: 'Ana Pérez',
   senderEmail: 'ana.perez@example.com',
-  bodyHtml: '<html><body><h1>Informe</h1><p>Resultados del <b>Q2</b> adjuntos.</p></body></html>',
+  bodyHtml: '<html><body><h1>Informe</h1><p>Resultados del <b>Q2</b> adjuntos.</p><p><a href="https://intranet.example.com/q2">Ver detalle</a></p></body></html>',
   bodyText: 'Informe\nResultados del Q2 adjuntos.',
   recipients: [
     { name: 'Oscar Henríquez', email: 'oscar@example.com', type: 'to' },
