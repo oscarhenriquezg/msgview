@@ -205,4 +205,50 @@ writeFileSync(join(outDir, 'header-only.msg'), Buffer.concat([
 // Vacío.
 writeFileSync(join(outDir, 'empty.msg'), Buffer.alloc(0));
 
+// ---------------------------------------------------------------------------
+// Fixture EML (RFC 5322) con multipart, imagen cid: y adjunto
+// ---------------------------------------------------------------------------
+
+const EML_SAMPLE = [
+  'From: "Ana Pérez" <ana.perez@example.com>',
+  'To: "Oscar Henríquez" <oscar@example.com>',
+  'Cc: dept@example.com',
+  'Subject: =?utf-8?B?' + Buffer.from('Correo EML de prueba').toString('base64') + '?=',
+  'Date: Mon, 10 Jun 2024 12:00:00 +0000',
+  'MIME-Version: 1.0',
+  'Content-Type: multipart/mixed; boundary="MIX"',
+  '',
+  '--MIX',
+  'Content-Type: multipart/alternative; boundary="ALT"',
+  '',
+  '--ALT',
+  'Content-Type: text/plain; charset=utf-8',
+  '',
+  'Versión en texto plano.',
+  '--ALT',
+  'Content-Type: text/html; charset=utf-8',
+  '',
+  '<html><body><h1>EML</h1><p>Con <b>imagen</b>:</p><img src="cid:foto1"><script>window.PWNED=1</script></body></html>',
+  '--ALT--',
+  '--MIX',
+  'Content-Type: image/png',
+  'Content-Transfer-Encoding: base64',
+  'Content-ID: <foto1>',
+  'Content-Disposition: inline; filename="foto.png"',
+  '',
+  PNG_1PX.toString('base64'),
+  '--MIX',
+  'Content-Type: text/csv; name="datos.csv"',
+  'Content-Transfer-Encoding: base64',
+  'Content-Disposition: attachment; filename="datos.csv"',
+  '',
+  Buffer.from('x;y\n1;2\n').toString('base64'),
+  '--MIX--',
+  ''
+].join('\r\n');
+writeFileSync(join(outDir, 'sample.eml'), EML_SAMPLE);
+
+// .msg renombrado a .eml: la detección debe ser por contenido.
+writeFileSync(join(outDir, 'renamed-msg.eml'), readFileSync(join(outDir, 'html-basic.msg')));
+
 console.log('Fixtures generados en', outDir);

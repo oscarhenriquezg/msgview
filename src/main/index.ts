@@ -22,7 +22,8 @@ import {
 } from './export/exporter';
 import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled } from './menu';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
-import { MsgAdapter } from './parser/MsgAdapter';
+import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
+import { addRecent, clearRecents, existingRecents } from './recents';
 import { parseBytes, parseFile, shutdownParser } from './parsing';
 
 /**
@@ -98,7 +99,7 @@ function bootstrap(): void {
         headers: { 'content-type': 'text/html; charset=utf-8' }
       })
     );
-    installMenu();
+    refreshMenu();
     registerIpc();
     mainWindow = createAppWindow(true);
 
@@ -169,6 +170,14 @@ function createAppWindow(isMain: boolean): BrowserWindow {
 
   installContextMenu(win);
 
+  // Resultados de búsqueda (Ctrl+F) hacia la barra del renderer.
+  win.webContents.on('found-in-page', (_e, result) => {
+    win.webContents.send('find-result', {
+      matches: result.matches,
+      active: result.activeMatchOrdinal
+    });
+  });
+
   const wcId = win.webContents.id;
   win.on('closed', () => {
     docs.delete(wcId);
@@ -214,7 +223,7 @@ function loadRenderer(win: BrowserWindow): Promise<void> {
 function msgPathFromArgv(argv: string[], cwd: string): string | null {
   const candidate = argv
     .slice(1)
-    .find((a) => !a.startsWith('-') && a.toLowerCase().endsWith('.msg'));
+    .find((a) => !a.startsWith('-') && /\.(msg|eml)$/i.test(a));
   if (!candidate) return null;
   return candidate.startsWith('/') ? candidate : join(cwd, candidate);
 }
@@ -246,10 +255,28 @@ async function openDocument(filePath: string, win: BrowserWindow): Promise<LoadR
       return failed;
     }
     win.setTitle(`${basename(filePath)} — MSG Viewer`);
+    addRecent(filePath);
+    refreshMenu();
   }
   setExportEnabled(docs.has(win.webContents.id));
   win.webContents.send('document-loaded', result);
   return result;
+}
+
+function refreshMenu(): void {
+  installMenu({
+    recents: existingRecents(),
+    onOpenRecent: (path) => {
+      const win = BrowserWindow.getFocusedWindow() ?? mainWindow;
+      if (win) void openDocument(path, win);
+    },
+    onClearRecents: () => {
+      clearRecents();
+      refreshMenu();
+    }
+  });
+  const focused = BrowserWindow.getFocusedWindow();
+  setExportEnabled(focused ? docs.has(focused.webContents.id) : false);
 }
 
 function registerIpc(): void {
@@ -257,7 +284,7 @@ function registerIpc(): void {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return null;
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      filters: [{ name: 'Mensajes de Outlook', extensions: ['msg'] }],
+      filters: [{ name: 'Mensajes de correo', extensions: ['msg', 'eml'] }],
       properties: ['openFile']
     });
     const first = filePaths[0];
@@ -325,7 +352,7 @@ function registerIpc(): void {
             defaultPath: target.fileName
           });
           if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
-          const data = MsgAdapter.getAttachmentContent(state.buffer, target.id);
+          const data = await getAnyAttachment(state.buffer, target.id);
           if (!data) return { ok: false, reason: 'error', detail: 'Adjunto ilegible' };
           await writeFile(filePath, data.content);
           return { ok: true, savedPaths: [filePath] };
@@ -340,7 +367,7 @@ function registerIpc(): void {
         await mkdir(dir, { recursive: true });
         const saved: string[] = [];
         for (const target of targets) {
-          const data = MsgAdapter.getAttachmentContent(state.buffer, target.id);
+          const data = await getAnyAttachment(state.buffer, target.id);
           if (!data) continue;
           const path = join(dir, uniqueName(target.fileName, saved));
           await writeFile(path, data.content);
@@ -386,6 +413,11 @@ function registerIpc(): void {
       case 'pdf':
         return exportPdf(doc, filePath);
       case 'eml':
+        if (!isCfbf(state.buffer)) {
+          // El origen ya es RFC 5322: copia byte a byte.
+          await writeFile(filePath, state.buffer);
+          return { ok: true, filePath };
+        }
         return exportEml(state.buffer, filePath);
       case 'png':
         return exportPng(doc, filePath, req.acceptTruncation ?? false);
@@ -419,6 +451,17 @@ function registerIpc(): void {
     return printDocument(state.document);
   });
 
+  // Búsqueda en página (Ctrl+F): findInPage cubre también el iframe.
+  ipcMain.on('find', (e, text: string) => {
+    if (typeof text === 'string' && text.length > 0) e.sender.findInPage(text);
+  });
+  ipcMain.on('find-next', (e, args: { text: string; forward: boolean }) => {
+    if (args?.text) e.sender.findInPage(args.text, { findNext: true, forward: args.forward });
+  });
+  ipcMain.on('find-stop', (e) => {
+    e.sender.stopFindInPage('clearSelection');
+  });
+
   ipcMain.on('show-in-folder', (_e, path: string) => {
     if (typeof path === 'string' && path) shell.showItemInFolder(path);
   });
@@ -448,7 +491,7 @@ async function openEmbedded(senderWcId: number, attachmentId: number): Promise<L
   }
   const meta = parent.document.attachments.find((a) => a.id === attachmentId);
   if (!meta?.isEmbeddedMsg) return { ok: false, error: { code: 'not-found' } };
-  const inner = MsgAdapter.getAttachmentContent(parent.buffer, attachmentId);
+  const inner = await getAnyAttachment(parent.buffer, attachmentId);
   if (!inner) return { ok: false, error: { code: 'parse-error', detail: 'Adjunto ilegible' } };
 
   const virtualPath = `${parent.document.sourcePath} › ${meta.fileName}`;
@@ -477,7 +520,7 @@ async function openAttachmentInTemp(
   attachmentId: number
 ): Promise<void> {
   const es = app.getLocale().startsWith('es');
-  const data = MsgAdapter.getAttachmentContent(state.buffer, attachmentId);
+  const data = await getAnyAttachment(state.buffer, attachmentId);
   if (!data) {
     notify(win, es ? 'Adjunto ilegible' : 'Unreadable attachment', undefined, true);
     return;
@@ -508,7 +551,7 @@ async function saveSingleAttachment(
     defaultPath: meta.fileName
   });
   if (canceled || !filePath) return;
-  const data = MsgAdapter.getAttachmentContent(state.buffer, attachmentId);
+  const data = await getAnyAttachment(state.buffer, attachmentId);
   if (!data) {
     notify(win, es ? 'Adjunto ilegible' : 'Unreadable attachment', undefined, true);
     return;

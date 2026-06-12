@@ -50,5 +50,8 @@
   "bodySource.html": "HTML nativo",
   "bodySource.rtf-deencapsulated": "HTML des-encapsulado de RTF",
   "bodySource.rtf-converted": "RTF convertido (aproximado)",
-  "bodySource.plaintext": "Texto plano"
+  "bodySource.plaintext": "Texto plano",
+  "header.subject": "Asunto",
+  "find.count": "{a} de {n}",
+  "toast.metaCopied": "Metadatos copiados al portapapeles"
 }

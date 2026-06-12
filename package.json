@@ -30,7 +30,6 @@
     "electron-vite": "^5.0.0",
     "eslint": "^10.4.1",
     "globals": "^17.6.0",
-    "mailparser": "^3.9.9",
     "playwright": "^1.60.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.0",
@@ -43,6 +42,7 @@
     "dompurify": "^3.4.10",
     "iconv-lite": "^0.7.2",
     "jsdom": "^29.1.1",
+    "mailparser": "^3.9.9",
     "rtf-stream-parser": "^3.8.1"
   },
   "main": "out/main/index.js",

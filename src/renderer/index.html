@@ -74,6 +74,18 @@
       </div>
     </dialog>
 
+    <!-- Búsqueda en el mensaje (Ctrl+F) -->
+    <div id="findbar" class="findbar" hidden>
+      <input id="find-input" type="text" spellcheck="false" />
+      <span id="find-count" class="muted"></span>
+      <button id="find-prev" class="findbtn" title="Shift+Enter">‹</button>
+      <button id="find-next" class="findbtn" title="Enter">›</button>
+      <button id="find-close" class="findbtn" title="Esc">✕</button>
+    </div>
+
+    <!-- Barra de estado anti-phishing: URL real del enlace bajo el cursor -->
+    <div id="linkbar" class="linkbar" hidden></div>
+
     <!-- UI-06: toasts -->
     <div id="toasts" class="toasts" aria-live="polite"></div>
   </div>

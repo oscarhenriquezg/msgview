@@ -243,6 +243,65 @@ dialog p { font-size: 13.5px; }
   margin-top: 16px;
 }
 
+/* ---------- Búsqueda (Ctrl+F) ---------- */
+.findbar {
+  position: fixed;
+  top: 8px;
+  right: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  padding: 6px 8px;
+}
+.findbar input {
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 4px 8px;
+  width: 200px;
+}
+.findbar input:focus { outline: 2px solid var(--accent); }
+#find-count { font-size: 12px; min-width: 48px; text-align: center; }
+.findbtn {
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.findbtn:hover { background: var(--chip-bg); }
+
+/* ---------- Barra de estado de enlaces (anti-phishing) ---------- */
+.linkbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  max-width: 75%;
+  z-index: 15;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-left: none;
+  border-radius: 0 8px 0 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- Toasts (UI-06) ---------- */
 .toasts {
   position: fixed;

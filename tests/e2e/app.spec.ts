@@ -150,6 +150,24 @@ test('Ver→Recargar conserva el documento (pull get-current-document)', async (
   await expect(page.locator('#empty-state')).toBeHidden();
 });
 
+test('abre archivos .eml (RFC 5322)', async () => {
+  await launch(join(FIXTURES, 'sample.eml'));
+  await expect(page.locator('#subject')).toHaveText('Correo EML de prueba');
+  await expect(page.frameLocator('#body-frame').locator('h1')).toHaveText('EML');
+  await expect(page.locator('.chip', { hasText: 'datos.csv' })).toBeVisible();
+});
+
+test('búsqueda en el mensaje (Ctrl+F) con contador', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await page.keyboard.press('Control+f');
+  await expect(page.locator('#findbar')).toBeVisible();
+  await page.locator('#find-input').fill('Informe');
+  await expect(page.locator('#find-count')).toContainText(/\d+ (de|of) \d+/, { timeout: 5000 });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#findbar')).toBeHidden();
+});
+
 test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
   await launch(join(FIXTURES, 'hostile-script.msg'));
   await expect(page.locator('#subject')).toHaveText('XSS attempt');

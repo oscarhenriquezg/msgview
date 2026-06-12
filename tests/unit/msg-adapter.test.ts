@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { parseAny } from '../../src/main/parser/AnyMessage';
 import { MsgAdapter } from '../../src/main/parser/MsgAdapter';
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
@@ -150,11 +151,13 @@ describe('MsgAdapter — extracción de adjuntos (FR-10)', () => {
   });
 });
 
-describe('Corpus de .msg reales (tests/fixtures/real/)', () => {
+describe('Corpus de mensajes reales (tests/fixtures/real/)', () => {
   const realDir = join(FIXTURES, 'real');
-  const files = existsSync(realDir) ? readdirSync(realDir).filter((f) => f.endsWith('.msg')) : [];
-  it.each(files.length > 0 ? files : [])('parsea %s sin crash', (file) => {
-    const result = MsgAdapter.parse(readFileSync(join(realDir, file)), file);
+  const files = existsSync(realDir)
+    ? readdirSync(realDir).filter((f) => /\.(msg|eml)$/i.test(f))
+    : [];
+  it.each(files.length > 0 ? files : [])('parsea %s sin crash', async (file) => {
+    const result = await parseAny(readFileSync(join(realDir, file)), file);
     if (result.ok) {
       expect(result.document.bodyHtml).not.toContain('<script');
     } else {
@@ -162,6 +165,6 @@ describe('Corpus de .msg reales (tests/fixtures/real/)', () => {
     }
   });
   if (files.length === 0) {
-    it.skip('no hay .msg reales en el corpus (copia archivos a tests/fixtures/real/)', () => {});
+    it.skip('no hay mensajes reales en el corpus (copia .msg/.eml a tests/fixtures/real/)', () => {});
   }
 });

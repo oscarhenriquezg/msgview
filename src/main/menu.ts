@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { app, BrowserWindow, Menu, shell } from 'electron';
 import { associateMsgFiles } from './associate';
 import type { ExportFormat } from '@shared/types';
@@ -13,7 +13,15 @@ import type { ExportFormat } from '@shared/types';
 export type MenuAction =
   | { type: 'open' }
   | { type: 'export'; format: ExportFormat }
-  | { type: 'print' };
+  | { type: 'print' }
+  | { type: 'find' }
+  | { type: 'copy-meta'; as: 'text' | 'json' };
+
+export interface MenuOptions {
+  recents: string[];
+  onOpenRecent: (path: string) => void;
+  onClearRecents: () => void;
+}
 
 /** Repositorio del proyecto (menú Ayuda). */
 const REPO_URL = 'https://github.com/oscarhenriquezg/msgview';
@@ -30,10 +38,16 @@ const STRINGS = {
     exportPng: 'Exportar a PNG…',
     print: 'Imprimir…',
     associate: 'Asociar archivos .msg a esta aplicación…',
+    recents: 'Recientes',
+    noRecents: '(vacío)',
+    clearRecents: 'Limpiar recientes',
     quit: 'Salir',
     edit: 'Edición',
     copy: 'Copiar',
     selectAll: 'Seleccionar todo',
+    find: 'Buscar en el mensaje…',
+    copyMeta: 'Copiar metadatos del mensaje',
+    copyMetaJson: 'Copiar metadatos como JSON',
     view: 'Ver',
     zoomIn: 'Acercar',
     zoomOut: 'Alejar',
@@ -66,10 +80,16 @@ const STRINGS = {
     exportPng: 'Export to PNG…',
     print: 'Print…',
     associate: 'Associate .msg files with this app…',
+    recents: 'Recent files',
+    noRecents: '(empty)',
+    clearRecents: 'Clear recents',
     quit: 'Quit',
     edit: 'Edit',
     copy: 'Copy',
     selectAll: 'Select all',
+    find: 'Find in message…',
+    copyMeta: 'Copy message metadata',
+    copyMetaJson: 'Copy metadata as JSON',
     view: 'View',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
@@ -172,8 +192,20 @@ function showAbout(parent: BrowserWindow | null): void {
   void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 
-export function installMenu(): void {
+export function installMenu(opts: MenuOptions): void {
   const s = L();
+  const recentsSubmenu: Electron.MenuItemConstructorOptions[] =
+    opts.recents.length === 0
+      ? [{ label: s.noRecents, enabled: false }]
+      : [
+          ...opts.recents.map((p) => ({
+            label: basename(p),
+            sublabel: p,
+            click: () => opts.onOpenRecent(p)
+          })),
+          { type: 'separator' as const },
+          { label: s.clearRecents, click: () => opts.onClearRecents() }
+        ];
   const isMac = process.platform === 'darwin';
   const isDev = Boolean(process.env['ELECTRON_RENDERER_URL']);
 
@@ -187,6 +219,7 @@ export function installMenu(): void {
           accelerator: 'CmdOrCtrl+O',
           click: () => sendToFocused({ type: 'open' })
         },
+        { label: s.recents, submenu: recentsSubmenu },
         { type: 'separator' },
         {
           id: 'export-pdf',
@@ -232,7 +265,27 @@ export function installMenu(): void {
       label: s.edit,
       submenu: [
         { role: 'copy', label: s.copy },
-        { role: 'selectAll', label: s.selectAll }
+        { role: 'selectAll', label: s.selectAll },
+        { type: 'separator' },
+        {
+          label: s.find,
+          accelerator: 'CmdOrCtrl+F',
+          click: () => sendToFocused({ type: 'find' })
+        },
+        { type: 'separator' },
+        {
+          id: 'copy-meta',
+          label: s.copyMeta,
+          accelerator: 'CmdOrCtrl+Shift+C',
+          enabled: false,
+          click: () => sendToFocused({ type: 'copy-meta', as: 'text' })
+        },
+        {
+          id: 'copy-meta-json',
+          label: s.copyMetaJson,
+          enabled: false,
+          click: () => sendToFocused({ type: 'copy-meta', as: 'json' })
+        }
       ]
     },
     {
@@ -320,7 +373,7 @@ export function installContextMenu(win: BrowserWindow): void {
 /** Habilita exportaciones e impresión solo con un documento cargado. */
 export function setExportEnabled(enabled: boolean): void {
   const menu = Menu.getApplicationMenu();
-  for (const id of ['export-pdf', 'export-eml', 'export-png', 'print']) {
+  for (const id of ['export-pdf', 'export-eml', 'export-png', 'print', 'copy-meta', 'copy-meta-json']) {
     const item = menu?.getMenuItemById(id);
     if (item) item.enabled = enabled;
   }

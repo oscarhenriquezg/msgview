@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { parentPort } from 'node:worker_threads';
 import type { LoadResult } from '@shared/types';
-import { MsgAdapter } from './MsgAdapter';
+import { parseAny } from './AnyMessage';
 
 /**
  * Worker de parsing (NFR-01): el archivo se lee y parsea fuera del hilo
@@ -26,7 +26,7 @@ parentPort?.on('message', async (job: ParseJob) => {
   let result: LoadResult;
   try {
     const buffer = job.bytes ? Buffer.from(job.bytes) : await readFile(job.filePath ?? '');
-    result = MsgAdapter.parse(buffer, job.filePath ?? job.virtualPath ?? '');
+    result = await parseAny(buffer, job.filePath ?? job.virtualPath ?? '');
   } catch (e) {
     const err = e as NodeJS.ErrnoException;
     result = {

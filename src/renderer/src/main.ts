@@ -22,8 +22,15 @@ const el = {
   viewer: $('viewer'),
   bodyFrame: $<HTMLIFrameElement>('body-frame'),
   pngDialog: $<HTMLDialogElement>('png-dialog'),
-  toasts: $('toasts')
+  toasts: $('toasts'),
+  findbar: $('findbar'),
+  findInput: $<HTMLInputElement>('find-input'),
+  findCount: $('find-count'),
+  linkbar: $('linkbar')
 };
+
+/** Documento mostrado (para copiar metadatos). */
+let currentDoc: MsgDocument | null = null;
 
 // ---------------------------------------------------------------------------
 // Estados de la ventana: vacío | error | documento (FR-03/04/05)
@@ -52,6 +59,7 @@ function showError(result: Extract<LoadResult, { ok: false }>): void {
 }
 
 function showDocument(doc: MsgDocument): void {
+  currentDoc = doc;
   el.emptyState.hidden = true;
   el.errorState.hidden = true;
   el.header.hidden = false;
@@ -246,6 +254,30 @@ function renderBody(sanitizedHtml: string): void {
       e.preventDefault();
       handleDrop(e.dataTransfer?.files);
     });
+    // Barra de estado anti-phishing: la URL real del enlace bajo el cursor.
+    doc.addEventListener('mouseover', (e) => {
+      const a = (e.target as Element | null)?.closest?.('a[href]');
+      const href = a?.getAttribute('href');
+      if (href && !href.startsWith('data:')) {
+        el.linkbar.textContent = href;
+        el.linkbar.hidden = false;
+      }
+    });
+    doc.addEventListener('mouseout', (e) => {
+      if ((e.target as Element | null)?.closest?.('a[href]')) {
+        el.linkbar.hidden = true;
+        el.linkbar.textContent = '';
+      }
+    });
+    // findInPage puede dejar el foco dentro del iframe: Esc y Ctrl+F deben
+    // seguir funcionando desde ahí.
+    doc.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !el.findbar.hidden) closeFindBar();
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        openFindBar();
+      }
+    });
   };
   el.bodyFrame.srcdoc = `<!DOCTYPE html>
 <html>
@@ -290,7 +322,7 @@ async function openEmbedded(id: number): Promise<void> {
  */
 function handleDrop(files?: FileList): void {
   const file = files?.[0];
-  if (!file || !file.name.toLowerCase().endsWith('.msg')) return;
+  if (!file || !/\.(msg|eml)$/i.test(file.name)) return;
   void api.openDroppedFile(file).then(applyResult);
 }
 
@@ -343,6 +375,118 @@ function askPngTruncation(contentHeight: number): void {
     max: MAX_PNG_HEIGHT
   });
   el.pngDialog.showModal();
+}
+
+// ---------------------------------------------------------------------------
+// Búsqueda en el mensaje (Ctrl+F): findInPage nativo vía main
+// ---------------------------------------------------------------------------
+
+let findDebounce: ReturnType<typeof setTimeout> | undefined;
+
+function openFindBar(): void {
+  if (el.viewer.hidden) return;
+  el.findbar.hidden = false;
+  el.findInput.focus();
+  el.findInput.select();
+}
+
+function closeFindBar(): void {
+  el.findbar.hidden = true;
+  el.findCount.textContent = '';
+  api.stopFind();
+}
+
+function setupFindBar(): void {
+  // Además del acelerador del menú: garantiza Ctrl/Cmd+F aunque el foco
+  // esté en cualquier parte del documento.
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      openFindBar();
+    } else if (e.key === 'Escape' && !el.findbar.hidden) {
+      closeFindBar();
+    }
+  });
+  el.findInput.addEventListener('input', () => {
+    clearTimeout(findDebounce);
+    const text = el.findInput.value;
+    findDebounce = setTimeout(() => {
+      if (text) api.find(text);
+      else {
+        api.stopFind();
+        el.findCount.textContent = '';
+      }
+    }, 150);
+  });
+  el.findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && el.findInput.value) {
+      api.findNext(el.findInput.value, !e.shiftKey);
+    } else if (e.key === 'Escape') {
+      closeFindBar();
+    }
+  });
+  $('find-next').addEventListener('click', () => {
+    if (el.findInput.value) api.findNext(el.findInput.value, true);
+  });
+  $('find-prev').addEventListener('click', () => {
+    if (el.findInput.value) api.findNext(el.findInput.value, false);
+  });
+  $('find-close').addEventListener('click', closeFindBar);
+  api.onFindResult((r) => {
+    el.findCount.textContent = t('find.count', { a: r.active, n: r.matches });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Copiar metadatos completos (texto / JSON)
+// ---------------------------------------------------------------------------
+
+function copyMetadata(as: 'text' | 'json'): void {
+  if (!currentDoc) return;
+  const m = currentDoc.metadata;
+  const fmt = (p: { name: string; email: string }) =>
+    p.name && p.name !== p.email ? (p.email ? `${p.name} <${p.email}>` : p.name) : p.email;
+  const byType = (type: 'to' | 'cc' | 'bcc') =>
+    m.recipients.filter((r) => r.type === type).map(fmt);
+  const files = currentDoc.attachments.filter((a) => !a.isInline).map((a) => a.fileName);
+
+  let out: string;
+  if (as === 'json') {
+    out = JSON.stringify(
+      {
+        subject: m.subject,
+        from: fmt(m.from),
+        to: byType('to'),
+        cc: byType('cc'),
+        bcc: byType('bcc'),
+        sentDate: m.sentDate ?? null,
+        receivedDate: m.receivedDate ?? null,
+        messageClass: m.messageClass,
+        signaturePresent: m.hasSignature,
+        attachments: files,
+        sourcePath: currentDoc.sourcePath
+      },
+      null,
+      2
+    );
+  } else {
+    const lines = [
+      `${t('header.subject')}: ${m.subject}`,
+      `${t('header.from')}: ${fmt(m.from)}`
+    ];
+    const to = byType('to');
+    const cc = byType('cc');
+    const bcc = byType('bcc');
+    if (to.length) lines.push(`${t('header.to')}: ${to.join('; ')}`);
+    if (cc.length) lines.push(`${t('header.cc')}: ${cc.join('; ')}`);
+    if (bcc.length) lines.push(`${t('header.bcc')}: ${bcc.join('; ')}`);
+    if (m.sentDate) lines.push(`${t('header.sent')}: ${m.sentDate}`);
+    if (m.receivedDate) lines.push(`${t('header.received')}: ${m.receivedDate}`);
+    if (files.length) lines.push(`${t('attachments.title')}: ${files.join('; ')}`);
+    out = lines.join('\n');
+  }
+  api.copyText(out);
+  toast(t('toast.metaCopied'));
 }
 
 // ---------------------------------------------------------------------------
@@ -418,6 +562,7 @@ async function init(): Promise<void> {
   $('btn-png-cancel').addEventListener('click', () => el.pngDialog.close());
 
   setupDragAndDrop();
+  setupFindBar();
 
   // FR-03: documentos abiertos por argv / open-file / segunda instancia.
   api.onDocumentLoaded(applyResult);
@@ -431,7 +576,9 @@ async function init(): Promise<void> {
           toast(`${t('toast.printError')}: ${r.detail ?? ''}`, undefined, true);
         }
       });
-    } else if (action.format === 'png') void pngButtonClicked();
+    } else if (action.type === 'find') openFindBar();
+    else if (action.type === 'copy-meta') copyMetadata(action.as);
+    else if (action.format === 'png') void pngButtonClicked();
     else void exportDocument(action.format);
   });
 

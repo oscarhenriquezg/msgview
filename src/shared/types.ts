@@ -106,12 +106,22 @@ export interface MsgViewerApi {
   showInFolder(path: string): void;
   /** main → renderer: un documento nuevo reemplaza al actual (FR-03). */
   onDocumentLoaded(cb: (result: LoadResult) => void): void;
-  /** main → renderer: acciones del menú de aplicación (Abrir, Exportar, Imprimir). */
+  /** main → renderer: acciones del menú de aplicación. */
   onMenuAction(
     cb: (
-      action: { type: 'open' } | { type: 'export'; format: ExportFormat } | { type: 'print' }
+      action:
+        | { type: 'open' }
+        | { type: 'export'; format: ExportFormat }
+        | { type: 'print' }
+        | { type: 'find' }
+        | { type: 'copy-meta'; as: 'text' | 'json' }
     ) => void
   ): void;
+  /** Búsqueda en el mensaje (findInPage nativo, cubre el iframe). */
+  find(text: string): void;
+  findNext(text: string, forward: boolean): void;
+  stopFind(): void;
+  onFindResult(cb: (r: { matches: number; active: number }) => void): void;
   /** Menú nativo del botón PNG: guardar a archivo o copiar al portapapeles. */
   askPngAction(): Promise<'save' | 'copy' | null>;
   /** Imprime el documento con el diálogo de impresión del sistema. */

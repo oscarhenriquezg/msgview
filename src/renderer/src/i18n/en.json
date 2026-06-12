@@ -50,5 +50,8 @@
   "bodySource.html": "Native HTML",
   "bodySource.rtf-deencapsulated": "HTML de-encapsulated from RTF",
   "bodySource.rtf-converted": "Converted RTF (approximate)",
-  "bodySource.plaintext": "Plain text"
+  "bodySource.plaintext": "Plain text",
+  "header.subject": "Subject",
+  "find.count": "{a} of {n}",
+  "toast.metaCopied": "Metadata copied to clipboard"
 }
