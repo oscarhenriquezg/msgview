@@ -1,5 +1,6 @@
 import type { LoadResult, MsgAttachmentMeta, MsgDocument } from '@shared/types';
 import { MAX_PNG_HEIGHT } from '@shared/types';
+import { ICONS } from './icons';
 import { initI18n, locale, t } from './i18n';
 
 const api = window.msgViewer;
@@ -32,13 +33,28 @@ const el = {
 
 /** Documento mostrado (para copiar metadatos). */
 let currentDoc: MsgDocument | null = null;
+/** Unlink: con true, los enlaces del cuerpo quedan inertes. */
+let linksDisabled = false;
+
+function applyLinkState(): void {
+  el.bodyFrame.contentDocument?.body?.classList.toggle('__nolinks', linksDisabled);
+  $('btn-unlink').setAttribute('aria-pressed', String(linksDisabled));
+}
 
 // ---------------------------------------------------------------------------
 // Estados de la ventana: vacío | error | documento (FR-03/04/05)
 // ---------------------------------------------------------------------------
 
+function setDocButtonsEnabled(enabled: boolean): void {
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-needs-doc]')) {
+    b.disabled = !enabled;
+  }
+}
+
 function showEmpty(): void {
-  el.toolbar.hidden = true;
+  currentDoc = null;
+  setDocButtonsEnabled(false);
+  closeFindBar();
   el.header.hidden = true;
   el.viewer.hidden = true;
   el.errorState.hidden = true;
@@ -46,7 +62,9 @@ function showEmpty(): void {
 }
 
 function showError(result: Extract<LoadResult, { ok: false }>): void {
-  el.toolbar.hidden = true;
+  currentDoc = null;
+  setDocButtonsEnabled(false);
+  closeFindBar();
   el.header.hidden = true;
   el.viewer.hidden = true;
   el.emptyState.hidden = true;
@@ -65,7 +83,7 @@ function showDocument(doc: MsgDocument): void {
   currentDoc = doc;
   el.emptyState.hidden = true;
   el.errorState.hidden = true;
-  el.toolbar.hidden = false;
+  setDocButtonsEnabled(true);
   el.header.hidden = false;
   el.viewer.hidden = false;
 
@@ -286,9 +304,11 @@ function renderBody(sanitizedHtml: string): void {
       const a = (e.target as Element | null)?.closest?.('a[href]');
       if (!a) return;
       e.preventDefault();
+      if (linksDisabled) return;
       const href = a.getAttribute('href') ?? '';
       if (/^(https?:|mailto:)/i.test(href)) api.openExternal(href);
     });
+    applyLinkState();
   };
   el.bodyFrame.srcdoc = `<!DOCTYPE html>
 <html>
@@ -301,6 +321,7 @@ function renderBody(sanitizedHtml: string): void {
          font-family: system-ui, sans-serif; font-size: 14px; }
   mark.__find { background: #ffe066; color: inherit; padding: 0; }
   mark.__find.__find-active { background: #ff9632; outline: 2px solid #ff9632; }
+  body.__nolinks a { pointer-events: none; opacity: 0.55; text-decoration: line-through; }
 </style>
 </head>
 <body>${sanitizedHtml}</body>
@@ -608,23 +629,47 @@ async function init(): Promise<void> {
   $('welcome-hint').textContent = t('welcome.hint');
   $('welcome-or').textContent = t('welcome.or');
   $('btn-welcome-open').textContent = t('welcome.open');
-  $('btn-save-copy').textContent = `💾 ${t('actions.saveAs')}`;
-  $('btn-export-pdf').textContent = `📄 ${t('actions.exportPdf')}`;
-  $('btn-export-eml').textContent = `✉️ ${t('actions.exportEml')}`;
-  $('btn-export-png').textContent = `🖼️ ${t('actions.exportPng')}`;
-  $('btn-find').title = t('actions.find');
-  $('btn-zoom-in').title = t('actions.zoomIn');
-  $('btn-zoom-out').title = t('actions.zoomOut');
-  $('btn-about').title = t('actions.about');
+  const iconBtn = (id: string, icon: string, title: string) => {
+    const b = $(id);
+    b.innerHTML = icon; // SVG estático de Lucide, contenido propio de la app
+    b.title = title;
+  };
+  iconBtn('btn-new', ICONS.new, t('actions.new'));
+  iconBtn('btn-open', ICONS.open, t('actions.open'));
+  iconBtn('btn-save-as', ICONS.save, t('actions.saveAs'));
+  iconBtn('btn-print', ICONS.print, t('actions.print'));
+  iconBtn('btn-find', ICONS.search, t('actions.find'));
+  iconBtn('btn-zoom-in', ICONS.zoomIn, t('actions.zoomIn'));
+  iconBtn('btn-zoom-reset', ICONS.zoomReset, t('actions.zoomReset'));
+  iconBtn('btn-zoom-out', ICONS.zoomOut, t('actions.zoomOut'));
+  iconBtn('btn-unlink', ICONS.unlink, t('actions.unlink'));
+  iconBtn('btn-about', ICONS.about, t('actions.about'));
+  for (const fmt of ['pdf', 'eml', 'png'] as const) {
+    const b = $(`btn-export-${fmt}`);
+    b.innerHTML = `${fmt.toUpperCase()} ${ICONS.export}`;
+    b.title = t(`actions.export${fmt.charAt(0).toUpperCase()}${fmt.slice(1)}`);
+  }
+  setDocButtonsEnabled(false);
   $('btn-png-truncate').textContent = t('png.tooTall.truncate');
   $('btn-png-cancel').textContent = t('png.tooTall.cancel');
   $('btn-error-open').textContent = t('actions.open');
 
   $('btn-welcome-open').addEventListener('click', () => void openDialog());
-  $('btn-save-copy').addEventListener('click', () => {
-    void api.saveCopy().then((r) => {
+  $('btn-new').addEventListener('click', () => {
+    void api.clearDocument().then(() => showEmpty());
+  });
+  $('btn-open').addEventListener('click', () => void openDialog());
+  $('btn-save-as').addEventListener('click', () => {
+    void api.saveAs().then((r) => {
       if (r.ok) toast(t('toast.saved'), r.filePath);
       else if (r.reason === 'error') toast(`${t('toast.saveError')}: ${r.detail ?? ''}`, undefined, true);
+    });
+  });
+  $('btn-print').addEventListener('click', () => {
+    void api.printDocument().then((r) => {
+      if (!r.ok && r.reason === 'error') {
+        toast(`${t('toast.printError')}: ${r.detail ?? ''}`, undefined, true);
+      }
     });
   });
   $('btn-find').addEventListener('click', () => {
@@ -632,7 +677,13 @@ async function init(): Promise<void> {
     else closeFindBar();
   });
   $('btn-zoom-in').addEventListener('click', () => api.zoom(1));
+  $('btn-zoom-reset').addEventListener('click', () => api.zoom(0));
   $('btn-zoom-out').addEventListener('click', () => api.zoom(-1));
+  $('btn-unlink').addEventListener('click', () => {
+    linksDisabled = !linksDisabled;
+    applyLinkState();
+    toast(t(linksDisabled ? 'toast.linksOff' : 'toast.linksOn'));
+  });
   $('btn-about').addEventListener('click', () => api.showAbout());
   $('btn-error-open').addEventListener('click', () => void openDialog());
   $('btn-export-pdf').addEventListener('click', () => void exportDocument('pdf'));

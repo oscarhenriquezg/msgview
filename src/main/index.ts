@@ -20,6 +20,8 @@ import {
   measurePngHeight,
   printDocument
 } from './export/exporter';
+import { buildPrintableHtml } from './export/printable';
+import { documentToText } from './export/textout';
 import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled, showAbout } from './menu';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
@@ -443,25 +445,67 @@ function registerIpc(): void {
     return printDocument(state.document);
   });
 
-  // "Guardar como": copia del archivo original (.msg/.eml).
-  ipcMain.handle('save-copy', async (e): Promise<ExportResult> => {
+  // "Guardar como": original / PDF / EML / PNG / HTML / TXT según extensión.
+  ipcMain.handle('save-as', async (e): Promise<ExportResult> => {
     const state = docs.get(e.sender.id);
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!state || !win) return { ok: false, reason: 'error', detail: 'Sin documento' };
-    const suggested = basename(state.document.sourcePath) || 'mensaje.msg';
-    const { canceled, filePath } = await dialog.showSaveDialog(win, { defaultPath: suggested });
+    const sourceName = basename(state.document.sourcePath) || 'mensaje.msg';
+    const sourceExt = extname(sourceName).replace('.', '') || 'msg';
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: sourceName,
+      filters: [
+        { name: `Original (.${sourceExt})`, extensions: [sourceExt] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'EML', extensions: ['eml'] },
+        { name: 'PNG', extensions: ['png'] },
+        { name: 'HTML', extensions: ['html'] },
+        { name: 'Texto', extensions: ['txt'] }
+      ]
+    });
     if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
     try {
-      await writeFile(filePath, state.buffer);
-      return { ok: true, filePath };
+      switch (extname(filePath).toLowerCase()) {
+        case '.pdf':
+          return await exportPdf(state.document, filePath);
+        case '.png':
+          return await exportPng(state.document, filePath, true);
+        case '.eml':
+          if (!isCfbf(state.buffer)) {
+            await writeFile(filePath, state.buffer);
+            return { ok: true, filePath };
+          }
+          return await exportEml(state.buffer, filePath);
+        case '.html':
+          await writeFile(filePath, buildPrintableHtml(state.document, app.getLocale()), 'utf-8');
+          return { ok: true, filePath };
+        case '.txt':
+          await writeFile(filePath, documentToText(state.document), 'utf-8');
+          return { ok: true, filePath };
+        default:
+          await writeFile(filePath, state.buffer);
+          return { ok: true, filePath };
+      }
     } catch (err) {
       return { ok: false, reason: 'error', detail: err instanceof Error ? err.message : String(err) };
     }
   });
 
+  // "Nuevo": descarta el documento de la ventana y vuelve al estado inicial.
+  ipcMain.handle('clear-document', (e) => {
+    docs.delete(e.sender.id);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    win?.setTitle('MSG Viewer');
+    setExportEnabled(false);
+  });
+
   // Zoom de la interfaz (botones +/− de la barra).
   ipcMain.on('zoom', (e, delta: number) => {
     if (typeof delta !== 'number' || !Number.isFinite(delta)) return;
+    if (delta === 0) {
+      e.sender.setZoomLevel(0); // reset al 100%
+      return;
+    }
     const level = e.sender.getZoomLevel() + Math.sign(delta) * 0.5;
     e.sender.setZoomLevel(Math.max(-3, Math.min(3, level)));
   });

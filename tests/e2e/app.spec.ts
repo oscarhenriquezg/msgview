@@ -197,6 +197,17 @@ test('búsqueda propia desplaza hasta la coincidencia activa', async () => {
   ).toHaveText('detalle');
 });
 
+test('Nuevo: vuelve al estado inicial sin mensaje', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await page.locator('#btn-new').click();
+  await expect(page.locator('#empty-state')).toBeVisible();
+  await expect(page.locator('#header')).toBeHidden();
+  // Los botones que requieren documento quedan deshabilitados.
+  await expect(page.locator('#btn-save-as')).toBeDisabled();
+  await expect(page.locator('#btn-export-pdf')).toBeDisabled();
+});
+
 test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
   await launch(join(FIXTURES, 'hostile-script.msg'));
   await expect(page.locator('#subject')).toHaveText('XSS attempt');

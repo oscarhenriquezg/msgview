@@ -58,5 +58,11 @@
   "actions.find": "Buscar en el mensaje (Ctrl+F)",
   "actions.zoomIn": "Acercar",
   "actions.zoomOut": "Alejar",
-  "actions.about": "Acerca de MSG Viewer"
+  "actions.about": "Acerca de MSG Viewer",
+  "actions.new": "Nuevo (cerrar mensaje)",
+  "actions.print": "Imprimir (Ctrl+P)",
+  "actions.zoomReset": "Zoom 100%",
+  "actions.unlink": "Deshabilitar enlaces del mensaje",
+  "toast.linksOff": "Enlaces deshabilitados por seguridad",
+  "toast.linksOn": "Enlaces habilitados"
 }

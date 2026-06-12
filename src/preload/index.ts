@@ -25,7 +25,8 @@ const api: MsgViewerApi & { openDroppedFile(file: File): Promise<LoadResult> } =
     ipcRenderer.on('menu-action', (_event, action) => cb(action));
   },
   copyText: (text) => clipboard.writeText(text),
-  saveCopy: () => ipcRenderer.invoke('save-copy'),
+  saveAs: () => ipcRenderer.invoke('save-as'),
+  clearDocument: () => ipcRenderer.invoke('clear-document'),
   zoom: (delta) => ipcRenderer.send('zoom', delta),
   showAbout: () => ipcRenderer.send('show-about'),
   openExternal: (url) => ipcRenderer.send('open-external', url),

@@ -113,7 +113,23 @@ h1 {
   padding: 8px 16px;
 }
 .toolbar .divider { width: 1px; align-self: stretch; background: var(--border); margin: 2px 2px; }
-.iconbtn { padding: 6px 9px; font-size: 14px; line-height: 1; }
+.iconbtn { padding: 6px 8px; line-height: 0; }
+.toolbar svg { width: 17px; height: 17px; stroke-width: 2; vertical-align: middle; }
+.exportbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.exportbtn svg { width: 14px; height: 14px; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:disabled:hover { border-color: var(--border); }
+.iconbtn[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
 
 .btn {
   font: inherit;

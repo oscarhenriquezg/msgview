@@ -58,5 +58,11 @@
   "actions.find": "Find in message (Ctrl+F)",
   "actions.zoomIn": "Zoom in",
   "actions.zoomOut": "Zoom out",
-  "actions.about": "About MSG Viewer"
+  "actions.about": "About MSG Viewer",
+  "actions.new": "New (close message)",
+  "actions.print": "Print (Ctrl+P)",
+  "actions.zoomReset": "Zoom 100%",
+  "actions.unlink": "Disable links in message",
+  "toast.linksOff": "Links disabled for safety",
+  "toast.linksOn": "Links enabled"
 }

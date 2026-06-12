@@ -117,8 +117,13 @@ export interface MsgViewerApi {
         | { type: 'copy-meta'; as: 'text' | 'json' }
     ) => void
   ): void;
-  /** Guarda una copia del archivo original (.msg/.eml) en disco. */
-  saveCopy(): Promise<ExportResult>;
+  /**
+   * "Guardar como": copia original, PDF, EML, PNG, HTML o TXT según la
+   * extensión elegida en el diálogo.
+   */
+  saveAs(): Promise<ExportResult>;
+  /** "Nuevo": descarta el documento de esta ventana en main. */
+  clearDocument(): Promise<void>;
   /** Zoom de la interfaz: delta en niveles de Chromium (±0.5 por paso). */
   zoom(delta: number): void;
   /** Abre la ventana "Acerca de". */

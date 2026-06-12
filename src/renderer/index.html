@@ -10,18 +10,26 @@
 <body>
   <div id="app">
     <!-- Barra de herramientas: por encima de la cabecera del mensaje -->
-    <nav id="toolbar" class="toolbar" aria-label="Acciones" hidden>
-      <button id="btn-save-copy" class="btn"></button>
-      <button id="btn-export-pdf" class="btn"></button>
-      <button id="btn-export-eml" class="btn"></button>
-      <button id="btn-export-png" class="btn"></button>
+    <nav id="toolbar" class="toolbar" aria-label="Acciones">
+      <button id="btn-new" class="btn iconbtn"></button>
+      <button id="btn-open" class="btn iconbtn"></button>
+      <button id="btn-save-as" class="btn iconbtn" data-needs-doc></button>
       <span class="divider" aria-hidden="true"></span>
-      <button id="btn-find" class="btn iconbtn">🔍</button>
+      <button id="btn-print" class="btn iconbtn" data-needs-doc></button>
       <span class="divider" aria-hidden="true"></span>
-      <button id="btn-zoom-in" class="btn iconbtn">＋</button>
-      <button id="btn-zoom-out" class="btn iconbtn">－</button>
+      <button id="btn-find" class="btn iconbtn" data-needs-doc></button>
       <span class="divider" aria-hidden="true"></span>
-      <button id="btn-about" class="btn iconbtn">ⓘ</button>
+      <button id="btn-export-pdf" class="btn exportbtn" data-needs-doc></button>
+      <button id="btn-export-eml" class="btn exportbtn" data-needs-doc></button>
+      <button id="btn-export-png" class="btn exportbtn" data-needs-doc></button>
+      <span class="divider" aria-hidden="true"></span>
+      <button id="btn-zoom-in" class="btn iconbtn"></button>
+      <button id="btn-zoom-reset" class="btn iconbtn"></button>
+      <button id="btn-zoom-out" class="btn iconbtn"></button>
+      <span class="divider" aria-hidden="true"></span>
+      <button id="btn-unlink" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
+      <span class="divider" aria-hidden="true"></span>
+      <button id="btn-about" class="btn iconbtn"></button>
     </nav>
 
     <!-- UI-02: panel de cabecera -->
