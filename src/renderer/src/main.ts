@@ -8,6 +8,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
 
 const el = {
+  toolbar: $('toolbar'),
   header: $('header'),
   subject: $('subject'),
   signatureBadge: $('signature-badge'),
@@ -37,6 +38,7 @@ let currentDoc: MsgDocument | null = null;
 // ---------------------------------------------------------------------------
 
 function showEmpty(): void {
+  el.toolbar.hidden = true;
   el.header.hidden = true;
   el.viewer.hidden = true;
   el.errorState.hidden = true;
@@ -44,6 +46,7 @@ function showEmpty(): void {
 }
 
 function showError(result: Extract<LoadResult, { ok: false }>): void {
+  el.toolbar.hidden = true;
   el.header.hidden = true;
   el.viewer.hidden = true;
   el.emptyState.hidden = true;
@@ -62,6 +65,7 @@ function showDocument(doc: MsgDocument): void {
   currentDoc = doc;
   el.emptyState.hidden = true;
   el.errorState.hidden = true;
+  el.toolbar.hidden = false;
   el.header.hidden = false;
   el.viewer.hidden = false;
 

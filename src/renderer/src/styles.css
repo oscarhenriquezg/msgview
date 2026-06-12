@@ -102,9 +102,17 @@ h1 {
   margin-bottom: 6px;
 }
 
-/* ---------- Acciones ---------- */
-.actions { display: flex; gap: 8px; flex: none; align-items: center; }
-.actions .divider { width: 1px; align-self: stretch; background: var(--border); margin: 2px 2px; }
+/* ---------- Barra de herramientas (sobre la cabecera) ---------- */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+}
+.toolbar .divider { width: 1px; align-self: stretch; background: var(--border); margin: 2px 2px; }
 .iconbtn { padding: 6px 9px; font-size: 14px; line-height: 1; }
 
 .btn {
