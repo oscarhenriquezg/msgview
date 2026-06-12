@@ -46,8 +46,12 @@ export async function associateMsgFiles(win: BrowserWindow | null): Promise<void
       ? `"${process.execPath}" %U`
       : `"${process.execPath}" "${app.getAppPath()}" %U`;
 
+  // En desarrollo, identidad separada: jamás debe pisar al .desktop del
+  // paquete instalado (mismo nombre = el de usuario gana y rompe el doble clic).
+  const isDev = !app.isPackaged && !appImage;
+  const desktopId = isDev ? 'msg-viewer-dev.desktop' : 'msg-viewer.desktop';
   const desktop = `[Desktop Entry]
-Name=MSG Viewer
+Name=MSG Viewer${isDev ? ' (dev)' : ''}
 Comment=Visor de archivos .msg de Outlook
 Exec=${execLine}
 Terminal=false
@@ -74,7 +78,7 @@ Categories=Office;
     await mkdir(appsDir, { recursive: true });
     await mkdir(mimeDir, { recursive: true });
     await mkdir(iconDir, { recursive: true });
-    await writeFile(join(appsDir, 'msg-viewer.desktop'), desktop, 'utf-8');
+    await writeFile(join(appsDir, desktopId), desktop, 'utf-8');
     await writeFile(join(mimeDir, 'msg-viewer.xml'), mimeXml, 'utf-8');
     await copyFile(APP_ICON_PATH, join(iconDir, 'msg-viewer.png')).catch(() => {});
 
@@ -82,7 +86,7 @@ Categories=Office;
     await run('update-mime-database', [join(home, '.local', 'share', 'mime')]).catch(() => {});
     await run('update-desktop-database', [appsDir]).catch(() => {});
     // Este es el paso decisivo:
-    await run('xdg-mime', ['default', 'msg-viewer.desktop', 'application/vnd.ms-outlook']);
+    await run('xdg-mime', ['default', desktopId, 'application/vnd.ms-outlook']);
 
     notify(
       es
