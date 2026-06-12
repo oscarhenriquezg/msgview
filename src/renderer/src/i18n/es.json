@@ -64,5 +64,12 @@
   "actions.zoomReset": "Zoom 100%",
   "actions.unlink": "Deshabilitar enlaces del mensaje",
   "toast.linksOff": "Enlaces deshabilitados por seguridad",
-  "toast.linksOn": "Enlaces habilitados"
+  "toast.linksOn": "Enlaces habilitados",
+  "actions.metaJson": "Copiar metadatos como JSON",
+  "actions.metaTxt": "Copiar metadatos como texto",
+  "actions.source": "Ver código fuente del correo",
+  "unlink.title": "Deshabilitar enlaces del mensaje",
+  "unlink.body": "Por tu seguridad, todos los enlaces de este mensaje quedarán deshabilitados para evitar que seas víctima de phishing o malware. Podrás reactivarlos con el mismo botón.",
+  "unlink.confirm": "Deshabilitar enlaces",
+  "unlink.cancel": "Cancelar"
 }

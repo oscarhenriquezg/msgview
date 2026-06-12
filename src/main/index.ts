@@ -25,6 +25,7 @@ import { documentToText } from './export/textout';
 import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled, showAbout } from './menu';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
+import { MsgAdapter } from './parser/MsgAdapter';
 import { addRecent, clearRecents, existingRecents } from './recents';
 import { parseBytes, parseFile, shutdownParser } from './parsing';
 
@@ -50,6 +51,8 @@ const tempDirs = new Set<string>();
 let mainWindow: BrowserWindow | null = null;
 /** Ruta recibida (argv / open-file) antes de que la ventana esté lista. */
 let pendingPath: string | null = null;
+/** Contenido de la vista de código fuente (servido por msgprint://source). */
+let sourceViewHtml = '';
 
 // Tests E2E: userData propio para no colisionar con una instancia en uso
 // (el lock de instancia única vive en userData).
@@ -95,12 +98,14 @@ function bootstrap(): void {
 
   void app.whenReady().then(() => {
     setupNetworkBlocking();
-    // Sirve el documento imprimible desde memoria (sin temporales, NFR-04).
-    protocol.handle('msgprint', () =>
-      new Response(getPrintableHtml(), {
+    // Sirve desde memoria el documento imprimible y la vista de código
+    // fuente (sin temporales, NFR-04).
+    protocol.handle('msgprint', (request) => {
+      const host = new URL(request.url).host;
+      return new Response(host === 'source' ? sourceViewHtml : getPrintableHtml(), {
         headers: { 'content-type': 'text/html; charset=utf-8' }
-      })
-    );
+      });
+    });
     refreshMenu();
     registerIpc();
     mainWindow = createAppWindow(true);
@@ -508,6 +513,63 @@ function registerIpc(): void {
     }
     const level = e.sender.getZoomLevel() + Math.sign(delta) * 0.5;
     e.sender.setZoomLevel(Math.max(-3, Math.min(3, level)));
+  });
+
+  // Vista de código fuente: cabeceras completas + cuerpo (análisis técnico).
+  ipcMain.on('view-source', (e) => {
+    const state = docs.get(e.sender.id);
+    const parent = BrowserWindow.fromWebContents(e.sender);
+    if (!state || !parent) return;
+    const es = app.getLocale().startsWith('es');
+    const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const MAX_SHOWN = 2 * 1024 * 1024;
+
+    let headers: string;
+    let body: string;
+    if (isCfbf(state.buffer)) {
+      const parts = MsgAdapter.getEmlParts(state.buffer);
+      headers = parts?.transportHeaders ?? '';
+      body = parts?.bodyHtml ?? parts?.bodyText ?? '';
+    } else {
+      const text = state.buffer.toString('utf-8');
+      const sep = text.search(/\r?\n\r?\n/);
+      headers = sep >= 0 ? text.slice(0, sep) : text;
+      body = sep >= 0 ? text.slice(sep).trimStart() : '';
+    }
+    const truncated = body.length > MAX_SHOWN;
+    if (truncated) body = body.slice(0, MAX_SHOWN);
+
+    const tHeaders = es ? 'Cabeceras de transporte' : 'Transport headers';
+    const tBody = es ? 'Cuerpo (código fuente)' : 'Body (source)';
+    const tNone = es ? '(no disponibles en este .msg)' : '(not available in this .msg)';
+    const tTrunc = es ? '… (truncado a 2 MB)' : '… (truncated to 2 MB)';
+    sourceViewHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; background: Canvas; color: CanvasText;
+         font-family: ui-monospace, 'Cascadia Code', Menlo, monospace; font-size: 12px; }
+  h2 { font-family: system-ui, sans-serif; font-size: 13px; position: sticky; top: 0;
+       background: Canvas; margin: 0; padding: 10px 16px; border-bottom: 1px solid GrayText; }
+  pre { margin: 0; padding: 12px 16px 24px; white-space: pre-wrap; word-break: break-all; }
+</style></head><body>
+<h2>${tHeaders}</h2><pre>${headers ? esc(headers) : tNone}</pre>
+<h2>${tBody}</h2><pre>${esc(body)}${truncated ? tTrunc : ''}</pre>
+</body></html>`;
+
+    const win = new BrowserWindow({
+      width: 900,
+      height: 700,
+      autoHideMenuBar: true,
+      title: `${es ? 'Código fuente' : 'Source'} — ${state.document.metadata.subject}`,
+      show: false,
+      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+    });
+    win.once('ready-to-show', () => win.show());
+    setTimeout(() => {
+      if (!win.isDestroyed() && !win.isVisible()) win.show();
+    }, 800);
+    void win.loadURL('msgprint://source/index.html');
   });
 
   ipcMain.on('show-about', (e) => {

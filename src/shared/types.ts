@@ -114,6 +114,7 @@ export interface MsgViewerApi {
         | { type: 'export'; format: ExportFormat }
         | { type: 'print' }
         | { type: 'find' }
+        | { type: 'save-as' }
         | { type: 'copy-meta'; as: 'text' | 'json' }
     ) => void
   ): void;
@@ -124,6 +125,8 @@ export interface MsgViewerApi {
   saveAs(): Promise<ExportResult>;
   /** "Nuevo": descarta el documento de esta ventana en main. */
   clearDocument(): Promise<void>;
+  /** Vista de código fuente: cabeceras completas y cuerpo (ventana nueva). */
+  viewSource(): void;
   /** Zoom de la interfaz: delta en niveles de Chromium (±0.5 por paso). */
   zoom(delta: number): void;
   /** Abre la ventana "Acerca de". */

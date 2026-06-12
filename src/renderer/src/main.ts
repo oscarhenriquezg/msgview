@@ -395,6 +395,12 @@ async function exportDocument(
   }
 }
 
+async function doSaveAs(): Promise<void> {
+  const r = await api.saveAs();
+  if (r.ok) toast(t('toast.saved'), r.filePath);
+  else if (r.reason === 'error') toast(`${t('toast.saveError')}: ${r.detail ?? ''}`, undefined, true);
+}
+
 /** Botón PNG: menú nativo Guardar / Copiar al portapapeles. */
 async function pngButtonClicked(): Promise<void> {
   const action = await api.askPngAction();
@@ -643,7 +649,15 @@ async function init(): Promise<void> {
   iconBtn('btn-zoom-reset', ICONS.zoomReset, t('actions.zoomReset'));
   iconBtn('btn-zoom-out', ICONS.zoomOut, t('actions.zoomOut'));
   iconBtn('btn-unlink', ICONS.unlink, t('actions.unlink'));
+  iconBtn('btn-meta-json', ICONS.metaJson, t('actions.metaJson'));
+  iconBtn('btn-meta-txt', ICONS.metaTxt, t('actions.metaTxt'));
+  iconBtn('btn-source', ICONS.source, t('actions.source'));
   iconBtn('btn-about', ICONS.about, t('actions.about'));
+  $('unlink-icon').innerHTML = ICONS.shield;
+  $('unlink-title').textContent = t('unlink.title');
+  $('unlink-body').textContent = t('unlink.body');
+  $('btn-unlink-confirm').textContent = t('unlink.confirm');
+  $('btn-unlink-cancel').textContent = t('unlink.cancel');
   for (const fmt of ['pdf', 'eml', 'png'] as const) {
     const b = $(`btn-export-${fmt}`);
     b.innerHTML = `${fmt.toUpperCase()} ${ICONS.export}`;
@@ -659,12 +673,7 @@ async function init(): Promise<void> {
     void api.clearDocument().then(() => showEmpty());
   });
   $('btn-open').addEventListener('click', () => void openDialog());
-  $('btn-save-as').addEventListener('click', () => {
-    void api.saveAs().then((r) => {
-      if (r.ok) toast(t('toast.saved'), r.filePath);
-      else if (r.reason === 'error') toast(`${t('toast.saveError')}: ${r.detail ?? ''}`, undefined, true);
-    });
-  });
+  $('btn-save-as').addEventListener('click', () => void doSaveAs());
   $('btn-print').addEventListener('click', () => {
     void api.printDocument().then((r) => {
       if (!r.ok && r.reason === 'error') {
@@ -680,10 +689,26 @@ async function init(): Promise<void> {
   $('btn-zoom-reset').addEventListener('click', () => api.zoom(0));
   $('btn-zoom-out').addEventListener('click', () => api.zoom(-1));
   $('btn-unlink').addEventListener('click', () => {
-    linksDisabled = !linksDisabled;
-    applyLinkState();
-    toast(t(linksDisabled ? 'toast.linksOff' : 'toast.linksOn'));
+    if (linksDisabled) {
+      linksDisabled = false;
+      applyLinkState();
+      toast(t('toast.linksOn'));
+    } else {
+      ($('unlink-dialog') as HTMLDialogElement).showModal();
+    }
   });
+  $('btn-unlink-confirm').addEventListener('click', () => {
+    ($('unlink-dialog') as HTMLDialogElement).close();
+    linksDisabled = true;
+    applyLinkState();
+    toast(t('toast.linksOff'));
+  });
+  $('btn-unlink-cancel').addEventListener('click', () =>
+    ($('unlink-dialog') as HTMLDialogElement).close()
+  );
+  $('btn-meta-json').addEventListener('click', () => copyMetadata('json'));
+  $('btn-meta-txt').addEventListener('click', () => copyMetadata('text'));
+  $('btn-source').addEventListener('click', () => api.viewSource());
   $('btn-about').addEventListener('click', () => api.showAbout());
   $('btn-error-open').addEventListener('click', () => void openDialog());
   $('btn-export-pdf').addEventListener('click', () => void exportDocument('pdf'));
@@ -711,6 +736,7 @@ async function init(): Promise<void> {
         }
       });
     } else if (action.type === 'find') openFindBar();
+    else if (action.type === 'save-as') void doSaveAs();
     else if (action.type === 'copy-meta') copyMetadata(action.as);
     else if (action.format === 'png') void pngButtonClicked();
     else void exportDocument(action.format);

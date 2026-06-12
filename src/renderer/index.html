@@ -29,6 +29,10 @@
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-unlink" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
       <span class="divider" aria-hidden="true"></span>
+      <button id="btn-meta-json" class="btn iconbtn" data-needs-doc></button>
+      <button id="btn-meta-txt" class="btn iconbtn" data-needs-doc></button>
+      <button id="btn-source" class="btn iconbtn" data-needs-doc></button>
+      <span class="divider" aria-hidden="true"></span>
       <button id="btn-about" class="btn iconbtn"></button>
     </nav>
 
@@ -101,6 +105,17 @@
 
     <!-- Barra de estado anti-phishing: URL real del enlace bajo el cursor -->
     <div id="linkbar" class="linkbar" hidden></div>
+
+    <!-- Confirmación de Unlink (seguridad) -->
+    <dialog id="unlink-dialog">
+      <div class="dialog-icon" id="unlink-icon" aria-hidden="true"></div>
+      <h3 id="unlink-title"></h3>
+      <p id="unlink-body"></p>
+      <div class="dialog-actions">
+        <button id="btn-unlink-cancel" class="btn"></button>
+        <button id="btn-unlink-confirm" class="btn primary"></button>
+      </div>
+    </dialog>
 
     <!-- UI-06: toasts -->
     <div id="toasts" class="toasts" aria-live="polite"></div>

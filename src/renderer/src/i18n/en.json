@@ -64,5 +64,12 @@
   "actions.zoomReset": "Zoom 100%",
   "actions.unlink": "Disable links in message",
   "toast.linksOff": "Links disabled for safety",
-  "toast.linksOn": "Links enabled"
+  "toast.linksOn": "Links enabled",
+  "actions.metaJson": "Copy metadata as JSON",
+  "actions.metaTxt": "Copy metadata as text",
+  "actions.source": "View message source",
+  "unlink.title": "Disable links in this message",
+  "unlink.body": "For your safety, all links in this message will be disabled to protect you from phishing or malware. You can re-enable them with the same button.",
+  "unlink.confirm": "Disable links",
+  "unlink.cancel": "Cancel"
 }

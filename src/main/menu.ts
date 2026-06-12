@@ -15,6 +15,7 @@ export type MenuAction =
   | { type: 'export'; format: ExportFormat }
   | { type: 'print' }
   | { type: 'find' }
+  | { type: 'save-as' }
   | { type: 'copy-meta'; as: 'text' | 'json' };
 
 export interface MenuOptions {
@@ -37,6 +38,7 @@ const STRINGS = {
     exportEml: 'Exportar a EML…',
     exportPng: 'Exportar a PNG…',
     print: 'Imprimir…',
+    saveAs: 'Guardar como…',
     associate: 'Asociar archivos .msg a esta aplicación…',
     recents: 'Recientes',
     noRecents: '(vacío)',
@@ -79,6 +81,7 @@ const STRINGS = {
     exportEml: 'Export to EML…',
     exportPng: 'Export to PNG…',
     print: 'Print…',
+    saveAs: 'Save as…',
     associate: 'Associate .msg files with this app…',
     recents: 'Recent files',
     noRecents: '(empty)',
@@ -145,6 +148,7 @@ export function showAbout(parent: BrowserWindow | null): void {
   :root { color-scheme: light dark; }
   body { margin:0; font-family: system-ui, sans-serif; text-align:center;
          padding: 26px 30px; background: Canvas; color: CanvasText; }
+  a { color: LinkText; font-size: 12.5px; }
   .icon { width:96px; height:96px; cursor:pointer; transition: transform .15s; user-select:none; }
   .icon:hover { transform: scale(1.06) rotate(-3deg); }
   h1 { font-size:17px; margin: 10px 0 2px; }
@@ -163,11 +167,14 @@ export function showAbout(parent: BrowserWindow | null): void {
   <h1>MSG Viewer</h1>
   <div class="ver">v${app.getVersion()}</div>
   <p>${esc(s.aboutDetail)}</p>
+  <p><a href="${REPO_URL}">${REPO_URL.replace('https://', '')}</a></p>
   <div id="egg"><b>${esc(s.eggTitle)} — ${esc(s.eggMessage)}</b>${esc(s.eggDetail)}</div>
   <button onclick="window.close()">${esc(s.closeBtn)}</button>
   <script>
-    document.getElementById('i').addEventListener('click', () =>
-      document.getElementById('egg').classList.add('show'));
+    let clicks = 0;
+    document.getElementById('i').addEventListener('click', () => {
+      if (++clicks >= 3) document.getElementById('egg').classList.add('show');
+    });
     addEventListener('keydown', (e) => { if (e.key === 'Escape') window.close(); });
   </script>
 </body></html>`;
@@ -189,6 +196,15 @@ export function showAbout(parent: BrowserWindow | null): void {
   setTimeout(() => {
     if (!win.isDestroyed() && !win.isVisible()) win.show();
   }, 800);
+  // El enlace al repo abre el navegador del sistema, nunca navega la ventana.
+  win.webContents.on('will-navigate', (e, url) => {
+    e.preventDefault();
+    if (url.startsWith('https://')) void shell.openExternal(url);
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
   void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 
@@ -220,6 +236,13 @@ export function installMenu(opts: MenuOptions): void {
           click: () => sendToFocused({ type: 'open' })
         },
         { label: s.recents, submenu: recentsSubmenu },
+        {
+          id: 'save-as',
+          label: s.saveAs,
+          accelerator: 'CmdOrCtrl+S',
+          enabled: false,
+          click: () => sendToFocused({ type: 'save-as' })
+        },
         { type: 'separator' },
         {
           id: 'export-pdf',
@@ -373,7 +396,7 @@ export function installContextMenu(win: BrowserWindow): void {
 /** Habilita exportaciones e impresión solo con un documento cargado. */
 export function setExportEnabled(enabled: boolean): void {
   const menu = Menu.getApplicationMenu();
-  for (const id of ['export-pdf', 'export-eml', 'export-png', 'print', 'copy-meta', 'copy-meta-json']) {
+  for (const id of ['export-pdf', 'export-eml', 'export-png', 'print', 'copy-meta', 'copy-meta-json', 'save-as']) {
     const item = menu?.getMenuItemById(id);
     if (item) item.enabled = enabled;
   }

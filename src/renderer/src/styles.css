@@ -261,6 +261,8 @@ dialog {
 }
 dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
 dialog h3 { margin: 0 0 8px; font-size: 15px; }
+.dialog-icon { text-align: center; margin-bottom: 10px; }
+.dialog-icon svg { width: 42px; height: 42px; color: var(--accent); }
 dialog p { font-size: 13.5px; }
 .dialog-actions {
   display: flex;
