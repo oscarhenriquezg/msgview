@@ -40,7 +40,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --linux
+      - run: npx electron-builder --linux --publish never
       - name: Verificar tamaño del artefacto (NFR-06 ≤150 MB)
         run: |
           for f in release/*.AppImage; do

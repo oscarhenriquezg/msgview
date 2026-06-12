@@ -1,0 +1,61 @@
+# Release: al subir un tag v* se construyen y publican los instalables.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run fixtures
+      - run: npm test
+      - run: npm run build
+      - run: npx electron-builder --linux --publish never
+      - name: Verificar tamaño (NFR-06 ≤150 MB)
+        run: |
+          for f in release/*.AppImage; do
+            size=$(stat -c%s "$f")
+            [ "$size" -le $((150 * 1024 * 1024)) ] || { echo "$f excede 150MB"; exit 1; }
+          done
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run fixtures
+      - run: npm test
+      - run: npm run build
+      # Sin firma: el dmg/zip se publica sin notarizar (Gatekeeper avisará).
+      # Para firmar: definir CSC_LINK / CSC_KEY_PASSWORD / APPLE_ID en secrets.
+      - run: npx electron-builder --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            release/*.dmg
+            release/*.zip
