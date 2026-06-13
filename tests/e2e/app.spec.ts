@@ -295,6 +295,67 @@ test('zoom y modo oscuro afectan solo al cuerpo; copiar vuelca su texto', async 
   expect(await app.evaluate(({ clipboard }) => clipboard.readHTML())).toMatch(/<b\b/i);
 });
 
+test('copiar: botón de asunto y direcciones copiables con aviso inmediato', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  // Botón de copiar a la derecha del asunto.
+  await page.locator('#btn-copy-subject').click();
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Informe trimestral Q2');
+  // Dirección: clase copyable + tooltip data-tip inmediato; clic copia el email.
+  const from = page.locator('#meta-table .email-copy').first();
+  await expect(from).toHaveClass(/copyable/);
+  await expect(from).toHaveAttribute('data-tip', /copiar|copy/i);
+  await from.click();
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('ana.perez@example.com');
+});
+
+test('la fecha de envío es copiable con aviso inmediato', async () => {
+  await launch(join(FIXTURES, 'sample.eml'));
+  await expect(page.locator('#subject')).toHaveText('Correo EML de prueba');
+  const sent = page.locator('#meta-table tr', { hasText: /Enviado|Sent/ }).locator('.copyable');
+  await expect(sent).toHaveAttribute('data-tip', /copiar|copy/i);
+  await sent.click();
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toMatch(/2024/);
+});
+
+test('toggle de enlaces engañosos con diálogo tipo Unlink', async () => {
+  await launch(join(FIXTURES, 'phishing-link.msg'));
+  const body = page.frameLocator('#body-frame');
+  await expect(body.locator('a#bad')).toHaveClass(/__link-mismatch/);
+  // Desactivar: botón → diálogo de confirmación → confirmar.
+  await page.locator('#btn-link-warn').click();
+  await expect(page.locator('#linkwarn-dialog')).toBeVisible();
+  await page.locator('#btn-linkwarn-confirm').click();
+  await expect(body.locator('a#bad')).not.toHaveClass(/__link-mismatch/);
+  await expect(page.locator('#btn-link-warn')).toHaveAttribute('aria-pressed', 'false');
+  // Reactivar de la misma forma.
+  await page.locator('#btn-link-warn').click();
+  await page.locator('#btn-linkwarn-confirm').click();
+  await expect(body.locator('a#bad')).toHaveClass(/__link-mismatch/);
+  await expect(page.locator('#btn-link-warn')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('Acerca de: diálogo in-app con la versión', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await page.locator('#btn-about').click();
+  await expect(page.locator('#about-dialog')).toBeVisible();
+  await expect(page.locator('#about-version')).toHaveText(/^v\d/);
+  await page.locator('#btn-about-close').click();
+  await expect(page.locator('#about-dialog')).toBeHidden();
+});
+
+test('Asociar tipos: diálogo in-app con casillas (sin asociar)', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.webContents.send('menu-action', { type: 'associate' })
+  );
+  await expect(page.locator('#associate-dialog')).toBeVisible();
+  await expect(page.locator('#associate-types input')).toHaveCount(3);
+  await page.locator('#btn-associate-cancel').click();
+  await expect(page.locator('#associate-dialog')).toBeHidden();
+});
+
 test('Nuevo: vuelve al estado inicial sin mensaje', async () => {
   await launch(join(FIXTURES, 'html-basic.msg'));
   await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');

@@ -118,6 +118,8 @@ export interface MsgViewerApi {
         | { type: 'save-as' }
         | { type: 'zoom'; delta: number }
         | { type: 'source' }
+        | { type: 'about' }
+        | { type: 'associate' }
         | { type: 'copy-meta'; as: 'text' | 'json' }
     ) => void
   ): void;
@@ -130,8 +132,10 @@ export interface MsgViewerApi {
   clearDocument(): Promise<void>;
   /** Vista de código fuente: cabeceras completas y cuerpo (ventana nueva). */
   viewSource(): void;
-  /** Abre la ventana "Acerca de". */
-  showAbout(): void;
+  /** Info para el diálogo "Acerca de" (versión, repo, plataforma). */
+  getAppInfo(): Promise<{ version: string; repoUrl: string; platform: string }>;
+  /** Asocia los tipos de archivo elegidos con la app (FR-01, Linux). */
+  associateTypes(exts: string[]): void;
   /**
    * Solicita abrir una URL externa en el navegador del sistema; main
    * muestra la advertencia de confianza antes de salir del visor.

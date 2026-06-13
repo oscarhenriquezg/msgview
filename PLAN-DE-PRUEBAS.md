@@ -99,6 +99,7 @@ Para las pruebas manuales: `npm run dev` y abrir los fixtures de
 | URL real del enlace al pasar el cursor | 🔍 Manual · hover sobre un enlace → barra inferior |
 | Advertencia antes de abrir enlace externo | ✅ Auto · E2E *clic en enlace: advertencia antes de salir…* |
 | **Resaltar discrepancia texto-vs-href (phishing)** | ✅ Auto · E2E *resalta enlaces cuyo texto aparenta otro dominio* |
+| Activar/desactivar el aviso de enlaces engañosos (diálogo) | ✅ Auto · E2E *toggle de enlaces engañosos con diálogo tipo Unlink* |
 | Unlink (deshabilitar todos los enlaces) | 🔍 Manual · botón Unlink → confirmar → enlaces inertes |
 | Firma presente (badge, no verificada) | 🔍 Manual · abrir un correo firmado |
 
@@ -126,13 +127,13 @@ Para las pruebas manuales: `npm run dev` y abrir los fixtures de
 | Menú Ver con separador + código fuente | ✅ Auto · E2E *menú Ver → código fuente…* |
 | Recordar documento tras recargar | ✅ Auto · E2E *Ver→Recargar conserva el documento* |
 | i18n (es/en según locale) | 🔍 Manual · arrancar con `LANG=en_US.UTF-8` |
-| Ventana "Acerca de" (+ easter egg) | 🔍 Manual · Ayuda → Acerca de |
+| Diálogo "Acerca de" in-app (+ easter egg) | ✅ Auto · E2E *Acerca de: diálogo in-app con la versión* + 🔍 Manual · easter egg (3 clics en el icono) |
 
 ## 9. Integración con el sistema operativo
 
 | Feature | Prueba |
 |---|---|
-| Asociar tipos de archivo (.msg/.eml/.emlx) | 🔍 Manual · menú → Asociar tipos |
+| Asociar tipos de archivo (diálogo in-app) | ✅ Auto · E2E *Asociar tipos: diálogo in-app con casillas* + 🔍 Manual · confirmar y comprobar la asociación real (xdg) |
 | Archivos recientes | 🔍 Manual · abrir varios y revisar el submenú Recientes |
 | Abrir enlace externo en el navegador | 🔍 Manual · confirmar advertencia y verificar que abre |
 | Mostrar en carpeta (tras guardar/exportar) | 🔍 Manual · botón del toast |

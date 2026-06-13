@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { app, BrowserWindow, Menu, shell } from 'electron';
-import { associateMsgFiles } from './associate';
 import type { ExportFormat } from '@shared/types';
 
 /**
@@ -18,6 +16,8 @@ export type MenuAction =
   | { type: 'save-as' }
   | { type: 'zoom'; delta: number }
   | { type: 'source' }
+  | { type: 'about' }
+  | { type: 'associate' }
   | { type: 'copy-meta'; as: 'text' | 'json' };
 
 export interface MenuOptions {
@@ -26,8 +26,8 @@ export interface MenuOptions {
   onClearRecents: () => void;
 }
 
-/** Repositorio del proyecto (menú Ayuda). */
-const REPO_URL = 'https://github.com/oscarhenriquezg/msgview';
+/** Repositorio del proyecto (menú Ayuda y diálogo "Acerca de"). */
+export const REPO_URL = 'https://github.com/oscarhenriquezg/msgview';
 
 /** Raíz del proyecto en dev y resources/app empaquetado (asar deshabilitado). */
 export const APP_ICON_PATH = join(app.getAppPath(), 'build', 'icon.png');
@@ -146,85 +146,6 @@ function sendToFocused(action: MenuAction): void {
   win?.webContents.send('menu-action', action);
 }
 
-/**
- * Acerca de: ventana propia (los diálogos nativos no permiten capturar
- * clics en el icono). El easter egg vive tras un clic en el icono.
- */
-export function showAbout(parent: BrowserWindow | null): void {
-  const s = L();
-  const esc = (x: string) =>
-    x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
-  let iconSrc = '';
-  try {
-    iconSrc = `data:image/png;base64,${readFileSync(APP_ICON_PATH).toString('base64')}`;
-  } catch {
-    // sin icono: el emoji de respaldo del HTML hace de sustituto
-  }
-
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-  :root { color-scheme: light dark; }
-  body { margin:0; font-family: system-ui, sans-serif; text-align:center;
-         padding: 26px 30px; background: Canvas; color: CanvasText; }
-  a { color: LinkText; font-size: 12.5px; }
-  .icon { width:96px; height:96px; cursor:pointer; transition: transform .15s; user-select:none; }
-  .icon:hover { transform: scale(1.06) rotate(-3deg); }
-  h1 { font-size:17px; margin: 10px 0 2px; }
-  .ver { color: GrayText; font-size: 12px; margin-bottom: 12px; }
-  p { font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; }
-  #egg { display:none; background: rgba(127,127,127,.12); border-radius: 10px;
-         padding: 12px 14px; font-size: 12.5px; line-height:1.5; text-align:left; }
-  #egg.show { display:block; animation: pop .25s ease-out; }
-  #egg b { display:block; margin-bottom: 4px; }
-  @keyframes pop { from { transform: scale(.85); opacity:0; } to { transform:none; opacity:1; } }
-  button { font:inherit; font-size:12.5px; margin-top:14px; padding:5px 18px;
-           border-radius:6px; border:1px solid GrayText; background:transparent;
-           color:inherit; cursor:pointer; }
-</style></head><body>
-  ${iconSrc ? `<img id="i" class="icon" src="${iconSrc}" alt="">` : `<div id="i" class="icon" style="font-size:72px">✉️</div>`}
-  <h1>MSG Viewer</h1>
-  <div class="ver">v${app.getVersion()}</div>
-  <p>${esc(s.aboutDetail)}</p>
-  <p><a href="${REPO_URL}">${REPO_URL.replace('https://', '')}</a></p>
-  <div id="egg"><b>${esc(s.eggTitle)} — ${esc(s.eggMessage)}</b>${esc(s.eggDetail)}</div>
-  <button onclick="window.close()">${esc(s.closeBtn)}</button>
-  <script>
-    let clicks = 0;
-    document.getElementById('i').addEventListener('click', () => {
-      if (++clicks >= 3) document.getElementById('egg').classList.add('show');
-    });
-    addEventListener('keydown', (e) => { if (e.key === 'Escape') window.close(); });
-  </script>
-</body></html>`;
-
-  const win = new BrowserWindow({
-    width: 430,
-    height: 460,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    autoHideMenuBar: true,
-    title: s.about,
-    modal: parent !== null,
-    parent: parent ?? undefined,
-    show: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
-  });
-  win.once('ready-to-show', () => win.show());
-  setTimeout(() => {
-    if (!win.isDestroyed() && !win.isVisible()) win.show();
-  }, 800);
-  // El enlace al repo abre el navegador del sistema, nunca navega la ventana.
-  win.webContents.on('will-navigate', (e, url) => {
-    e.preventDefault();
-    if (url.startsWith('https://')) void shell.openExternal(url);
-  });
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-}
 
 export function installMenu(opts: MenuOptions): void {
   const s = L();
@@ -341,8 +262,7 @@ export function installMenu(opts: MenuOptions): void {
         { type: 'separator' },
         {
           label: s.associate,
-          click: (_item, win) =>
-            associateMsgFiles(win instanceof BrowserWindow ? win : null)
+          click: () => sendToFocused({ type: 'associate' })
         },
         { type: 'separator' },
         isMac ? { role: 'close' as const } : { role: 'quit' as const, label: s.quit }
@@ -437,8 +357,7 @@ export function installMenu(opts: MenuOptions): void {
         { type: 'separator' },
         {
           label: s.about,
-          click: (_item, win) =>
-            void showAbout(win instanceof BrowserWindow ? win : null)
+          click: () => sendToFocused({ type: 'about' })
         }
       ]
     }

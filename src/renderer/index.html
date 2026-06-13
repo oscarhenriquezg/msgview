@@ -31,6 +31,7 @@
       <button id="btn-dark-body" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-unlink" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
+      <button id="btn-link-warn" class="btn iconbtn" data-needs-doc aria-pressed="true"></button>
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-meta-json" class="btn iconbtn" data-needs-doc></button>
       <button id="btn-meta-txt" class="btn iconbtn" data-needs-doc></button>
@@ -44,6 +45,7 @@
       <div class="header-top">
         <div class="meta">
           <h1 id="subject"></h1>
+          <button id="btn-copy-subject" class="subject-copy copyable" data-needs-doc></button>
           <div id="signature-badge" class="badge" hidden></div>
           <table id="meta-table" aria-label="Metadatos del mensaje"></table>
         </div>
@@ -141,6 +143,46 @@
       <div class="dialog-actions">
         <button id="btn-unlink-cancel" class="btn"></button>
         <button id="btn-unlink-confirm" class="btn primary"></button>
+      </div>
+    </dialog>
+
+    <!-- Acerca de (mismo estilo que los demás diálogos) -->
+    <dialog id="about-dialog" class="about-dialog">
+      <div class="dialog-icon" id="about-icon" role="img"></div>
+      <h3 id="about-name">MSG Viewer</h3>
+      <div id="about-version" class="muted"></div>
+      <p id="about-detail"></p>
+      <p><a id="about-repo" href="#"></a></p>
+      <div id="about-egg" class="about-egg" hidden></div>
+      <div class="dialog-actions">
+        <button id="btn-about-close" class="btn primary"></button>
+      </div>
+    </dialog>
+
+    <!-- Asociar tipos de archivo (FR-01) -->
+    <dialog id="associate-dialog">
+      <div class="dialog-icon" id="associate-icon" aria-hidden="true"></div>
+      <h3 id="associate-title"></h3>
+      <p id="associate-intro"></p>
+      <div id="associate-types" class="assoc-types">
+        <label><input type="checkbox" value="msg" checked /> Outlook (.msg)</label>
+        <label><input type="checkbox" value="eml" checked /> Email estándar (.eml)</label>
+        <label><input type="checkbox" value="emlx" checked /> Apple Mail (.emlx)</label>
+      </div>
+      <div class="dialog-actions">
+        <button id="btn-associate-cancel" class="btn"></button>
+        <button id="btn-associate-confirm" class="btn primary"></button>
+      </div>
+    </dialog>
+
+    <!-- Activar/desactivar el aviso de enlaces engañosos -->
+    <dialog id="linkwarn-dialog">
+      <div class="dialog-icon" id="linkwarn-icon" aria-hidden="true"></div>
+      <h3 id="linkwarn-title"></h3>
+      <p id="linkwarn-body"></p>
+      <div class="dialog-actions">
+        <button id="btn-linkwarn-cancel" class="btn"></button>
+        <button id="btn-linkwarn-confirm" class="btn primary"></button>
       </div>
     </dialog>
 

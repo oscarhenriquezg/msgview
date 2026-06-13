@@ -25,8 +25,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/preload/index.ts'),
-          source: resolve('src/preload/source.ts'),
-          associate: resolve('src/preload/associate.ts')
+          source: resolve('src/preload/source.ts')
         }
       }
     }

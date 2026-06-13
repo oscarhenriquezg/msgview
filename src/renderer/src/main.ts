@@ -27,6 +27,8 @@ const el = {
   pngDialog: $<HTMLDialogElement>('png-dialog'),
   leaveDialog: $<HTMLDialogElement>('leave-dialog'),
   leaveUrl: $<HTMLTextAreaElement>('leave-url'),
+  aboutDialog: $<HTMLDialogElement>('about-dialog'),
+  associateDialog: $<HTMLDialogElement>('associate-dialog'),
   pngTargetDialog: $<HTMLDialogElement>('png-target-dialog'),
   toasts: $('toasts'),
   findbar: $('findbar'),
@@ -120,6 +122,8 @@ function showDocument(doc: MsgDocument): void {
   el.viewer.hidden = false;
 
   el.subject.textContent = doc.metadata.subject || t('header.noSubject');
+  // El botón de copiar va inline, justo tras la última palabra del asunto.
+  el.subject.append($('btn-copy-subject'));
   el.signatureBadge.hidden = !doc.metadata.hasSignature;
   el.signatureBadge.textContent = t('header.signature');
   renderMetaTable(doc);
@@ -140,6 +144,29 @@ function metaRow(label: string, value: HTMLElement | string): HTMLTableRowElemen
   return tr;
 }
 
+/**
+ * Span copiable con un clic. El tooltip "Clic para copiar" aparece al instante
+ * (CSS :hover, sin la demora del title nativo).
+ */
+function copyable(display: string, copyValue: string, extraClass = ''): HTMLElement {
+  const span = document.createElement('span');
+  span.className = extraClass ? `copyable ${extraClass}` : 'copyable';
+  span.textContent = display;
+  span.dataset.tip = t('meta.clickToCopy');
+  span.tabIndex = 0;
+  span.setAttribute('role', 'button');
+  span.setAttribute('aria-label', `${t('meta.clickToCopy')}: ${copyValue}`);
+  const copy = () => {
+    api.copyText(copyValue);
+    toast(t('toast.copied', { what: copyValue }));
+  };
+  span.addEventListener('click', copy);
+  span.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') copy();
+  });
+  return span;
+}
+
 /** Direcciones copiables con un clic + "copiar todos" por campo. */
 function addressCell(people: { name: string; email: string }[]): HTMLElement {
   const cell = document.createElement('span');
@@ -148,21 +175,7 @@ function addressCell(people: { name: string; email: string }[]): HTMLElement {
     const display =
       p.name && p.name !== p.email ? (p.email ? `${p.name} <${p.email}>` : p.name) : p.email || p.name;
     if (p.email) {
-      const span = document.createElement('span');
-      span.className = 'email-copy';
-      span.textContent = display;
-      span.title = `${t('meta.clickToCopy')}: ${p.email}`;
-      span.tabIndex = 0;
-      span.setAttribute('role', 'button');
-      const copy = () => {
-        api.copyText(p.email);
-        toast(t('toast.copied', { what: p.email }));
-      };
-      span.addEventListener('click', copy);
-      span.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') copy();
-      });
-      cell.append(span);
+      cell.append(copyable(display, p.email, 'email-copy'));
     } else {
       cell.append(display);
     }
@@ -193,10 +206,16 @@ function renderMetaTable(doc: MsgDocument): void {
       rows.push(metaRow(t(`header.${type}`), addressCell(people)));
     }
   }
-  const dateFmt = (iso?: string) =>
-    iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'full', timeStyle: 'short' }) : '';
-  if (m.sentDate) rows.push(metaRow(t('header.sent'), dateFmt(m.sentDate)));
-  if (m.receivedDate) rows.push(metaRow(t('header.received'), dateFmt(m.receivedDate)));
+  const dateFmt = (iso: string) =>
+    new Date(iso).toLocaleString(locale(), { dateStyle: 'full', timeStyle: 'short' });
+  if (m.sentDate) {
+    const s = dateFmt(m.sentDate);
+    rows.push(metaRow(t('header.sent'), copyable(s, s)));
+  }
+  if (m.receivedDate) {
+    const r = dateFmt(m.receivedDate);
+    rows.push(metaRow(t('header.received'), copyable(r, r)));
+  }
 
   el.metaTable.replaceChildren(...rows);
 }
@@ -350,7 +369,7 @@ function renderBody(sanitizedHtml: string): void {
       const href = a.getAttribute('href') ?? '';
       if (/^(https?:|mailto:)/i.test(href)) confirmLeave(href);
     });
-    markLinkDiscrepancies(doc);
+    applyMismatchState();
     applyLinkState();
     applyBodyView();
   };
@@ -424,6 +443,27 @@ function hostsDiffer(shown: string, real: string): boolean {
   return !real.endsWith('.' + shown) && !shown.endsWith('.' + real);
 }
 
+/** Resaltado de enlaces engañosos: activable/desactivable como Unlink. */
+let mismatchHighlight = true;
+
+/** Aplica el estado actual del aviso de enlaces engañosos al cuerpo y al botón. */
+function applyMismatchState(): void {
+  const doc = el.bodyFrame.contentDocument;
+  if (doc) {
+    if (mismatchHighlight) markLinkDiscrepancies(doc);
+    else clearLinkDiscrepancies(doc);
+  }
+  $('btn-link-warn').setAttribute('aria-pressed', String(mismatchHighlight));
+}
+
+/** Quita las marcas de enlace engañoso del cuerpo. */
+function clearLinkDiscrepancies(doc: Document): void {
+  for (const a of Array.from(doc.querySelectorAll('a.__link-mismatch'))) {
+    a.classList.remove('__link-mismatch');
+    a.removeAttribute('title');
+  }
+}
+
 /**
  * Marca los enlaces cuyo texto visible aparenta un dominio distinto al host
  * real del href (técnica de phishing). El texto que no aparenta un dominio
@@ -444,6 +484,40 @@ function markLinkDiscrepancies(doc: Document): void {
       );
     }
   }
+}
+
+/** Info de la app (versión, repo, plataforma) para el diálogo "Acerca de". */
+let appInfo = { version: '', repoUrl: '', platform: '' };
+let eggClicks = 0;
+
+/** Diálogo "Acerca de" in-app (mismo estilo que los demás). */
+function openAboutDialog(): void {
+  $('about-version').textContent = appInfo.version ? `v${appInfo.version}` : '';
+  $('about-detail').textContent = t('about.detail');
+  const repo = $<HTMLAnchorElement>('about-repo');
+  repo.textContent = appInfo.repoUrl.replace(/^https?:\/\//, '');
+  $('about-egg').hidden = true;
+  eggClicks = 0;
+  el.aboutDialog.showModal();
+}
+
+/** Diálogo "Asociar tipos de archivo" in-app. En macOS muestra instrucciones. */
+function openAssociateDialog(): void {
+  const mac = appInfo.platform === 'darwin';
+  $('associate-intro').textContent = mac ? t('associate.macIntro') : t('associate.intro');
+  $('associate-types').hidden = mac;
+  $('btn-associate-cancel').hidden = mac;
+  $('btn-associate-confirm').textContent = mac ? t('associate.macClose') : t('associate.confirm');
+  el.associateDialog.showModal();
+}
+
+/** Abre el diálogo (estilo Unlink) para activar/desactivar el aviso de enlaces. */
+function openLinkwarnDialog(): void {
+  const off = mismatchHighlight; // si está activo, la acción será desactivar
+  $('linkwarn-title').textContent = t(off ? 'linkwarn.titleOff' : 'linkwarn.titleOn');
+  $('linkwarn-body').textContent = t(off ? 'linkwarn.bodyOff' : 'linkwarn.bodyOn');
+  $('btn-linkwarn-confirm').textContent = t(off ? 'linkwarn.confirmOff' : 'linkwarn.confirmOn');
+  ($('linkwarn-dialog') as HTMLDialogElement).showModal();
 }
 
 /** URL pendiente de confirmar en el diálogo "Salir del visor". */
@@ -845,6 +919,7 @@ function setupDragAndDrop(): void {
 
 async function init(): Promise<void> {
   initI18n(await api.getLocale());
+  appInfo = await api.getAppInfo();
   document.title = t('app.title');
 
   $('welcome-title').textContent = t('welcome.title');
@@ -866,15 +941,25 @@ async function init(): Promise<void> {
   iconBtn('btn-zoom-out', ICONS.zoomOut, t('actions.zoomOut'));
   iconBtn('btn-dark-body', ICONS.darkBody, t('actions.darkBody'));
   iconBtn('btn-unlink', ICONS.unlink, t('actions.unlink'));
+  iconBtn('btn-link-warn', ICONS.linkWarn, t('actions.linkWarn'));
   iconBtn('btn-meta-json', ICONS.metaJson, t('actions.metaJson'));
   iconBtn('btn-meta-txt', ICONS.metaTxt, t('actions.metaTxt'));
   iconBtn('btn-source', ICONS.source, t('actions.source'));
   iconBtn('btn-about', ICONS.about, t('actions.about'));
+  iconBtn('btn-copy-subject', ICONS.copy, t('actions.copySubject'));
+  $('btn-copy-subject').dataset.tip = t('actions.copySubject');
   $('unlink-icon').innerHTML = ICONS.shield;
   $('unlink-title').textContent = t('unlink.title');
   $('unlink-body').textContent = t('unlink.body');
   $('btn-unlink-confirm').textContent = t('unlink.confirm');
   $('btn-unlink-cancel').textContent = t('unlink.cancel');
+  $('linkwarn-icon').innerHTML = ICONS.shieldAlert;
+  $('btn-linkwarn-cancel').textContent = t('unlink.cancel');
+  $('about-icon').innerHTML = ICONS.about;
+  $('btn-about-close').textContent = t('about.close');
+  $('associate-icon').innerHTML = ICONS.open;
+  $('associate-title').textContent = t('associate.title');
+  $('btn-associate-cancel').textContent = t('associate.cancel');
   $('leave-icon').innerHTML = ICONS.shieldAlert;
   $('leave-title').textContent = t('leave.title');
   $('leave-body').textContent = t('leave.body');
@@ -937,6 +1022,16 @@ async function init(): Promise<void> {
   $('btn-unlink-cancel').addEventListener('click', () =>
     ($('unlink-dialog') as HTMLDialogElement).close()
   );
+  $('btn-link-warn').addEventListener('click', () => openLinkwarnDialog());
+  $('btn-linkwarn-confirm').addEventListener('click', () => {
+    ($('linkwarn-dialog') as HTMLDialogElement).close();
+    mismatchHighlight = !mismatchHighlight;
+    applyMismatchState();
+    toast(t(mismatchHighlight ? 'toast.linkWarnOn' : 'toast.linkWarnOff'));
+  });
+  $('btn-linkwarn-cancel').addEventListener('click', () =>
+    ($('linkwarn-dialog') as HTMLDialogElement).close()
+  );
   $('btn-leave-open').addEventListener('click', () => {
     el.leaveDialog.close();
     if (pendingLeaveUrl) api.openExternal(pendingLeaveUrl);
@@ -946,10 +1041,37 @@ async function init(): Promise<void> {
     el.leaveDialog.close();
     pendingLeaveUrl = '';
   });
+  $('btn-copy-subject').addEventListener('click', () => {
+    if (!currentDoc) return;
+    api.copyText(currentDoc.metadata.subject || '');
+    toast(t('toast.copied', { what: t('header.subject') }));
+  });
   $('btn-meta-json').addEventListener('click', () => copyMetadata('json'));
   $('btn-meta-txt').addEventListener('click', () => copyMetadata('text'));
   $('btn-source').addEventListener('click', () => api.viewSource());
-  $('btn-about').addEventListener('click', () => api.showAbout());
+  $('btn-about').addEventListener('click', () => openAboutDialog());
+  $('btn-about-close').addEventListener('click', () => el.aboutDialog.close());
+  $('about-repo').addEventListener('click', (e) => {
+    e.preventDefault();
+    if (appInfo.repoUrl) api.openExternal(appInfo.repoUrl);
+  });
+  $('about-icon').addEventListener('click', () => {
+    if (++eggClicks < 3) return;
+    const egg = $('about-egg');
+    const b = document.createElement('b');
+    b.textContent = `${t('about.eggTitle')} — ${t('about.eggMessage')}`;
+    egg.replaceChildren(b, document.createTextNode(t('about.eggDetail')));
+    egg.hidden = false;
+  });
+  $('btn-associate-cancel').addEventListener('click', () => el.associateDialog.close());
+  $('btn-associate-confirm').addEventListener('click', () => {
+    el.associateDialog.close();
+    if (appInfo.platform === 'darwin') return; // macOS: solo instrucciones
+    const exts = Array.from(
+      el.associateDialog.querySelectorAll<HTMLInputElement>('input:checked')
+    ).map((c) => c.value);
+    if (exts.length > 0) api.associateTypes(exts);
+  });
   $('btn-error-open').addEventListener('click', () => void openDialog());
   $('btn-export').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -994,6 +1116,8 @@ async function init(): Promise<void> {
     else if (action.type === 'save-as') void doSaveAs();
     else if (action.type === 'zoom') changeBodyZoom(action.delta);
     else if (action.type === 'source') api.viewSource();
+    else if (action.type === 'about') openAboutDialog();
+    else if (action.type === 'associate') openAssociateDialog();
     else if (action.type === 'copy-meta') copyMetadata(action.as);
     else if (action.format === 'png') openPngTargetDialog();
     else void exportDocument(action.format);

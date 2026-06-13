@@ -25,7 +25,8 @@ import { buildPrintableHtml } from './export/printable';
 import { documentToText } from './export/textout';
 import { documentToMarkdown } from './export/markdown';
 import { documentToJson, exportMht, exportZip } from './export/bundle';
-import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled, showAbout } from './menu';
+import { APP_ICON_PATH, REPO_URL, installContextMenu, installMenu, setExportEnabled } from './menu';
+import { registerFileTypes } from './associate';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
 import { MsgAdapter } from './parser/MsgAdapter';
@@ -664,8 +665,17 @@ function registerIpc(): void {
     }
   });
 
-  ipcMain.on('show-about', (e) => {
-    showAbout(BrowserWindow.fromWebContents(e.sender));
+  // Info para el diálogo "Acerca de" in-app (renderer).
+  ipcMain.handle('get-app-info', () => ({
+    version: app.getVersion(),
+    repoUrl: REPO_URL,
+    platform: process.platform
+  }));
+
+  // Asociación de tipos elegida en el diálogo in-app (FR-01).
+  ipcMain.on('associate-types', (e, exts: string[]) => {
+    if (!Array.isArray(exts) || exts.length === 0) return;
+    void registerFileTypes(exts, BrowserWindow.fromWebContents(e.sender));
   });
 
   // Abre el enlace externo en el navegador. La confirmación anti-phishing la

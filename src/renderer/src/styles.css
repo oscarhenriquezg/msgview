@@ -58,6 +58,46 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+/* Botón de copiar el asunto: inline, pegado a la última palabra del título. */
+.subject-copy {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 2px;
+  line-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.subject-copy:hover { color: var(--accent); border-color: var(--accent); }
+.subject-copy:disabled { opacity: 0.45; cursor: default; }
+.subject-copy svg { width: 14px; height: 14px; }
+/* El tooltip se ancla a la derecha del botón para no cortarse en el borde. */
+.subject-copy.copyable:hover::after,
+.subject-copy.copyable:focus-visible::after { left: auto; right: 0; }
+
+/* Tooltip "Clic para copiar" inmediato (sin la demora del title nativo). */
+.copyable { position: relative; cursor: pointer; }
+.copyable:hover::after,
+.copyable:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 3px);
+  z-index: 30;
+  white-space: nowrap;
+  background: var(--text);
+  color: var(--surface);
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
 #meta-table { border-collapse: collapse; font-size: 12.5px; }
 #meta-table td { padding: 1px 0; vertical-align: top; }
 #meta-table td.label {
@@ -326,6 +366,37 @@ dialog p { font-size: 13.5px; }
   white-space: pre-wrap;
 }
 .url-box:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Diálogo "Acerca de" */
+.about-dialog { text-align: center; }
+.about-dialog h3 { margin: 4px 0 2px; font-size: 18px; }
+#about-icon { cursor: pointer; user-select: none; transition: transform 0.15s; }
+#about-icon:hover { transform: scale(1.06) rotate(-3deg); }
+#about-icon svg { width: 72px; height: 72px; }
+#about-version { margin-bottom: 12px; }
+#about-detail { white-space: pre-line; line-height: 1.5; }
+.about-egg {
+  text-align: left;
+  background: var(--chip-bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.about-egg b { display: block; margin-bottom: 4px; }
+.about-dialog .dialog-actions { justify-content: center; }
+
+/* Diálogo "Asociar tipos de archivo" */
+.assoc-types { display: flex; flex-direction: column; gap: 2px; }
+.assoc-types label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  cursor: pointer;
+  font-size: 13px;
+}
 
 /* ---------- Búsqueda (Ctrl+F) ---------- */
 .findbar {

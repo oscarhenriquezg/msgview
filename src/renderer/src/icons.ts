@@ -15,6 +15,7 @@ import shieldAlert from 'lucide-static/icons/shield-alert.svg?raw';
 import shieldCheck from 'lucide-static/icons/shield-check.svg?raw';
 import squareCode from 'lucide-static/icons/square-code.svg?raw';
 import squareDashedText from 'lucide-static/icons/square-dashed-text.svg?raw';
+import triangleAlert from 'lucide-static/icons/triangle-alert.svg?raw';
 import squareArrowUpRight from 'lucide-static/icons/square-arrow-up-right.svg?raw';
 import unlink from 'lucide-static/icons/unlink.svg?raw';
 import zoomIn from 'lucide-static/icons/zoom-in.svg?raw';
@@ -34,6 +35,7 @@ export const ICONS = {
   unlink,
   shield: shieldCheck,
   shieldAlert,
+  linkWarn: triangleAlert,
   metaJson: braces,
   metaTxt: squareDashedText,
   source: squareCode,
