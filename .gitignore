@@ -13,3 +13,6 @@ tests/fixtures/*.msg
 tests/fixtures/*.eml
 .claude/
 *.rpm
+
+# Documentación de trabajo local (no versionada)
+extras/

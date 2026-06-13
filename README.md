@@ -10,62 +10,51 @@ nunca abandona tu equipo.
 
 ## Características
 
-### Visualización
-- **Mensajes de correo completos**: asunto, remitente, destinatarios (Para/CC/CCO),
-  fechas de envío y recepción, cuerpo y adjuntos.
-- **Resolución de cuerpo en cascada**: HTML nativo → RTF des-encapsulado
-  (recupera el HTML original que Outlook envuelve en RTF, con alta fidelidad) →
-  conversión RTF aproximada → texto plano.
-- **Imágenes incrustadas** (`cid:`) renderizadas en su posición; las imágenes
-  remotas se bloquean y se muestran como placeholder (privacidad por diseño).
-- **También archivos `.eml`** (RFC 5322) y `.emlx` (Apple Mail), con
-  detección por contenido: un `.msg` renombrado a `.eml` se abre igual.
-- **Mensajes `.msg`/`.eml` anidados**: se abren en ventana propia para
-  comparar correos lado a lado.
-- **Direcciones de Exchange**: resuelve la dirección SMTP real en lugar de
-  mostrar el DN X.500 interno (`/o=ExchangeLabs/...`).
-- Tema claro/oscuro automático e interfaz en español e inglés (según el idioma
-  del sistema; i18n externalizado para añadir más idiomas).
+### 📬 Visualización
 
-### Seguridad y privacidad
-- El cuerpo del correo se trata siempre como **contenido hostil**: sanitización
-  (DOMPurify) + iframe sandbox sin scripts + CSP restrictiva.
-- **Bloqueo total de red** en capa de sesión: la aplicación no abre sockets
-  externos (verificable con `tcpdump`). Cero telemetría, cero analítica.
-- **Anti-phishing**: la URL real de cada enlace se muestra al pasar el cursor,
-  y hacer clic exige confirmar una advertencia antes de salir al navegador.
-- **Unlink**: un botón deshabilita todos los enlaces del mensaje (quedan
-  tachados e inertes) para inspeccionar correos sospechosos sin riesgo.
-- Los adjuntos solo se escriben a disco por acción explícita del usuario;
-  los temporales de "Abrir" se purgan al salir.
+| Característica | Detalle |
+|---|---|
+| **Formatos de entrada** | `.msg` (Outlook), `.eml` (RFC 5322) y `.emlx` (Apple Mail), con **detección por contenido** (una extensión renombrada se abre igual) |
+| **Metadatos completos** | Asunto, remitente, destinatarios (Para/CC/CCO), fechas de envío y recepción |
+| **Cuerpo en cascada** | HTML nativo → RTF des-encapsulado (recupera el HTML original de Outlook) → RTF aproximado → texto plano |
+| **Imágenes incrustadas** | Las `cid:` se renderizan en su posición; las remotas se bloquean (placeholder) |
+| **Mensajes anidados** | Un `.msg`/`.eml` adjunto se abre en **ventana propia** para comparar lado a lado |
+| **Direcciones de Exchange** | Resuelve el SMTP real en vez del DN X.500 interno (`/o=ExchangeLabs/...`) |
+| **Idioma y tema** | Español/inglés según el sistema · claro/oscuro automático |
 
-### Acciones
-- **Barra de herramientas** con iconos [Lucide](https://lucide.dev):
-  Nuevo · Abrir · Guardar como · Imprimir · Buscar · PDF/EML/PNG ·
-  zoom (+/100%/−) · Unlink · metadatos · código fuente · Acerca de.
-- **Guardar como…** (Ctrl+S) en un solo diálogo: copia original, **PDF**,
-  **EML**, **PNG**, **HTML** o **TXT** según la extensión elegida.
-- **Exportar** (submenú Archivo → Exportar) a **PDF** (A4/Carta según región,
-  sin diálogo de impresión), **EML** (MIME estándar abrible en Thunderbird),
-  **PNG** (página completa, con opción de **copiar la imagen al portapapeles**),
-  **HTML**, **TXT**, **MHT** (web autocontenida con imágenes embebidas),
-  **JSON** (metadatos + cuerpo, para pipelines) y **ZIP** (correo original +
-  metadata + cuerpos + carpeta `attachments/` con todos los adjuntos).
-- **Imprimir** con el diálogo del sistema (Ctrl+P).
-- **Búsqueda en el mensaje** (Ctrl+F) con resaltado, contador y
-  desplazamiento hasta la coincidencia activa.
-- **Archivos recientes** en el menú Archivo (persistentes).
-- **Adjuntos**: clic para Abrir con la aplicación predeterminada o Guardar;
-  "Guardar todos" en una carpeta; integridad binaria garantizada.
-- **Copiar direcciones con un clic** (y "copiar todos" por campo), y
-  **copiar los metadatos completos** del mensaje como texto o JSON.
-- **Vista de código fuente**: cabeceras de transporte completas y cuerpo
-  en crudo, para análisis técnico.
-- Menú contextual: copiar texto, copiar imagen, seleccionar todo.
-- Drag & drop de archivos `.msg`/`.eml` en cualquier estado de la ventana.
-- **Asociación con el sistema** desde el menú Archivo: doble clic en
-  cualquier `.msg` lo abre aquí (Linux vía xdg-mime; en macOS con
-  instrucciones de Finder).
+### 🔒 Seguridad y privacidad
+
+| Característica | Detalle |
+|---|---|
+| **Contenido hostil** | El cuerpo se sanitiza (DOMPurify) y se aísla en un iframe sandbox sin scripts + CSP restrictiva |
+| **Sin red** | Bloqueo total de tráfico saliente en capa de sesión (verificable con `tcpdump`). Cero telemetría |
+| **Anti-phishing** | La URL real de cada enlace se ve al pasar el cursor; el clic exige confirmar antes de salir al navegador |
+| **Unlink** | Un botón deja todos los enlaces inertes (tachados) para inspeccionar correos sospechosos sin riesgo |
+| **Adjuntos bajo control** | Solo se escriben a disco por acción explícita; los temporales de "Abrir" se purgan al salir |
+
+### 🛠️ Acciones y exportación
+
+| Característica | Detalle |
+|---|---|
+| **Barra de herramientas** | Iconos [Lucide](https://lucide.dev): Nuevo · Abrir · Guardar como · Imprimir · Buscar · PDF/EML/PNG · zoom · Unlink · metadatos · código fuente · Acerca de |
+| **Exportar** (8 formatos) | **PDF** (A4/Carta), **EML**, **PNG** (+copiar al portapapeles), **HTML**, **TXT**, **MHT** (web con imágenes embebidas), **JSON** (pipelines) y **ZIP** (correo + metadata + cuerpos + adjuntos) |
+| **Guardar como…** | Un diálogo, formato según la extensión elegida (Ctrl+S) |
+| **Imprimir** | Diálogo del sistema sobre el mensaje y su cabecera (Ctrl+P) |
+| **Búsqueda** | En el cuerpo (Ctrl+F): resaltado, contador y desplazamiento a la coincidencia |
+| **Adjuntos** | Clic para Abrir con la app predeterminada o Guardar; "Guardar todos" con integridad verificada |
+| **Copiar** | Direcciones con un clic (o todas por campo) · metadatos como texto o JSON |
+| **Archivos recientes** | Últimos 10, persistentes, en el menú Archivo |
+| **Asociación con el SO** | Diálogo para elegir qué tipos (.msg/.eml/.emlx) abre la app (Linux vía xdg-mime; macOS guía de Finder) |
+
+### 🔬 Análisis técnico (vista de código fuente)
+
+| Característica | Detalle |
+|---|---|
+| **Resaltado de sintaxis** | Cabeceras, etiquetas/atributos HTML y bloques base64, con búsqueda, copiar, imprimir y exportar |
+| **Ruta del mensaje** | Cadena `Received` cronológica con la **demora entre saltos** y resultados **SPF/DKIM/DMARC** |
+| **Decodificador** | Selecciona base64 o quoted-printable y lo descodifica en el sitio |
+| **Propiedades MAPI crudas** | Tabla completa de PidTag del `.msg` (forense) |
+| **Diff de sanitización** | Lista exacta de scripts/manejadores que el correo traía y se eliminaron |
 
 ## Instalación
 
