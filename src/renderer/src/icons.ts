@@ -3,7 +3,8 @@
  * cero peticiones en runtime (NFR-03/04).
  */
 import braces from 'lucide-static/icons/braces.svg?raw';
-import circleOff from 'lucide-static/icons/circle-off.svg?raw';
+import contrast from 'lucide-static/icons/contrast.svg?raw';
+import copy from 'lucide-static/icons/copy.svg?raw';
 import filePlusCorner from 'lucide-static/icons/file-plus-corner.svg?raw';
 import fileSearchCorner from 'lucide-static/icons/file-search-corner.svg?raw';
 import folderOpen from 'lucide-static/icons/folder-open.svg?raw';
@@ -24,10 +25,11 @@ export const ICONS = {
   save,
   print: printer,
   search: fileSearchCorner,
+  copy,
   export: squareArrowUpRight,
   zoomIn,
   zoomOut,
-  zoomReset: circleOff,
+  darkBody: contrast,
   unlink,
   shield: shieldCheck,
   metaJson: braces,

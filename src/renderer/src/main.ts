@@ -37,10 +37,38 @@ const el = {
 let currentDoc: MsgDocument | null = null;
 /** Unlink: con true, los enlaces del cuerpo quedan inertes. */
 let linksDisabled = false;
+/** Zoom del cuerpo del mensaje (solo el iframe, no la ventana). */
+let bodyZoom = 1;
+/** Modo oscuro del cuerpo (accesibilidad): fondo oscuro, letra clara. */
+let bodyDark = false;
+
+const BODY_ZOOM_STEP = 0.1;
+const BODY_ZOOM_MIN = 0.5;
+const BODY_ZOOM_MAX = 3;
 
 function applyLinkState(): void {
   el.bodyFrame.contentDocument?.body?.classList.toggle('__nolinks', linksDisabled);
   $('btn-unlink').setAttribute('aria-pressed', String(linksDisabled));
+}
+
+/** Aplica el zoom y el tema actuales al cuerpo; se reinvoca tras cada render. */
+function applyBodyView(): void {
+  const body = el.bodyFrame.contentDocument?.body;
+  if (body) {
+    body.style.zoom = String(bodyZoom);
+    body.classList.toggle('__dark', bodyDark);
+  }
+  $('btn-dark-body').setAttribute('aria-pressed', String(bodyDark));
+}
+
+/** delta > 0 acerca, < 0 aleja, 0 restablece al 100 %. */
+function changeBodyZoom(delta: number): void {
+  if (delta === 0) bodyZoom = 1;
+  else {
+    const next = bodyZoom + Math.sign(delta) * BODY_ZOOM_STEP;
+    bodyZoom = Math.max(BODY_ZOOM_MIN, Math.min(BODY_ZOOM_MAX, Math.round(next * 100) / 100));
+  }
+  applyBodyView();
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +339,7 @@ function renderBody(sanitizedHtml: string): void {
       if (/^(https?:|mailto:)/i.test(href)) api.openExternal(href);
     });
     applyLinkState();
+    applyBodyView();
   };
   el.bodyFrame.srcdoc = `<!DOCTYPE html>
 <html>
@@ -324,6 +353,19 @@ function renderBody(sanitizedHtml: string): void {
   mark.__find { background: #ffe066; color: inherit; padding: 0; }
   mark.__find.__find-active { background: #ff9632; outline: 2px solid #ff9632; }
   body.__nolinks a { pointer-events: none; opacity: 0.55; text-decoration: line-through; }
+  /* Accesibilidad (WCAG 1.4.3): modo oscuro forzado. Se imponen fondo oscuro y
+     texto claro con !important, que gana a los colores inline del correo
+     (pensados para fondo claro y que de otro modo quedarían ilegibles). Así se
+     garantiza contraste suficiente sea cual sea el color original del texto. */
+  body.__dark { background-color: #1c1c1e !important; color: #e6e6e6 !important; }
+  body.__dark * {
+    background-color: transparent !important;
+    color: #e6e6e6 !important;
+    border-color: #4a4a4a !important;
+  }
+  body.__dark a, body.__dark a * { color: #6db3f2 !important; }
+  body.__dark mark.__find { background-color: #ffe066 !important; color: #1a1a1a !important; }
+  body.__dark mark.__find.__find-active { background-color: #ff9632 !important; }
 </style>
 </head>
 <body>${sanitizedHtml}</body>
@@ -629,6 +671,46 @@ function copyMetadata(as: 'text' | 'json'): void {
   toast(t('toast.metaCopied'));
 }
 
+/**
+ * Copia al portapapeles conservando el formato (texto enriquecido e imágenes).
+ * Si hay una selección en el cuerpo, copia solo lo seleccionado; si no, copia
+ * todo el cuerpo. Usa la copia nativa del documento (execCommand) para producir
+ * el mismo portapapeles que Ctrl+C, con sus formatos HTML e imagen.
+ */
+function copyBody(): void {
+  const win = el.bodyFrame.contentWindow;
+  const doc = el.bodyFrame.contentDocument;
+  const sel = win?.getSelection();
+  if (!win || !doc?.body || !sel) return;
+
+  const hasSelection = sel.rangeCount > 0 && !sel.isCollapsed;
+  if (!hasSelection && !doc.body.innerHTML.trim()) {
+    toast(t('toast.bodyEmpty'), undefined, true);
+    return;
+  }
+
+  // Sin selección: seleccionar todo el cuerpo solo para copiar, y restaurar.
+  let autoSelected = false;
+  if (!hasSelection) {
+    const range = doc.createRange();
+    range.selectNodeContents(doc.body);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    autoSelected = true;
+  }
+
+  let ok: boolean;
+  try {
+    ok = doc.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  if (autoSelected) sel.removeAllRanges();
+
+  if (ok) toast(t(hasSelection ? 'toast.selectionCopied' : 'toast.bodyCopied'));
+  else toast(t('toast.copyError'), undefined, true);
+}
+
 // ---------------------------------------------------------------------------
 // Toasts (UI-06)
 // ---------------------------------------------------------------------------
@@ -691,10 +773,11 @@ async function init(): Promise<void> {
   iconBtn('btn-open', ICONS.open, t('actions.open'));
   iconBtn('btn-save-as', ICONS.save, t('actions.saveAs'));
   iconBtn('btn-print', ICONS.print, t('actions.print'));
+  iconBtn('btn-copy', ICONS.copy, t('actions.copy'));
   iconBtn('btn-find', ICONS.search, t('actions.find'));
   iconBtn('btn-zoom-in', ICONS.zoomIn, t('actions.zoomIn'));
-  iconBtn('btn-zoom-reset', ICONS.zoomReset, t('actions.zoomReset'));
   iconBtn('btn-zoom-out', ICONS.zoomOut, t('actions.zoomOut'));
+  iconBtn('btn-dark-body', ICONS.darkBody, t('actions.darkBody'));
   iconBtn('btn-unlink', ICONS.unlink, t('actions.unlink'));
   iconBtn('btn-meta-json', ICONS.metaJson, t('actions.metaJson'));
   iconBtn('btn-meta-txt', ICONS.metaTxt, t('actions.metaTxt'));
@@ -736,9 +819,13 @@ async function init(): Promise<void> {
     if (el.findbar.hidden) openFindBar();
     else closeFindBar();
   });
-  $('btn-zoom-in').addEventListener('click', () => api.zoom(1));
-  $('btn-zoom-reset').addEventListener('click', () => api.zoom(0));
-  $('btn-zoom-out').addEventListener('click', () => api.zoom(-1));
+  $('btn-copy').addEventListener('click', () => copyBody());
+  $('btn-zoom-in').addEventListener('click', () => changeBodyZoom(1));
+  $('btn-zoom-out').addEventListener('click', () => changeBodyZoom(-1));
+  $('btn-dark-body').addEventListener('click', () => {
+    bodyDark = !bodyDark;
+    applyBodyView();
+  });
   $('btn-unlink').addEventListener('click', () => {
     if (linksDisabled) {
       linksDisabled = false;
@@ -803,6 +890,8 @@ async function init(): Promise<void> {
       });
     } else if (action.type === 'find') openFindBar();
     else if (action.type === 'save-as') void doSaveAs();
+    else if (action.type === 'zoom') changeBodyZoom(action.delta);
+    else if (action.type === 'source') api.viewSource();
     else if (action.type === 'copy-meta') copyMetadata(action.as);
     else if (action.format === 'png') openPngTargetDialog();
     else void exportDocument(action.format);

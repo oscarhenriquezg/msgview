@@ -214,6 +214,51 @@ test('búsqueda propia desplaza hasta la coincidencia activa', async () => {
   ).toHaveText('detalle');
 });
 
+test('zoom y modo oscuro afectan solo al cuerpo; copiar vuelca su texto', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  const body = page.frameLocator('#body-frame').locator('body');
+
+  // Zoom: acercar/alejar cambian el zoom del cuerpo, no el de la ventana.
+  await page.locator('#btn-zoom-in').click();
+  await page.locator('#btn-zoom-in').click();
+  await expect(body).toHaveCSS('zoom', '1.2');
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.webContents.getZoomLevel()
+  )).toBe(0);
+
+  // Modo oscuro (accesibilidad): clase __dark y estado aria-pressed.
+  await page.locator('#btn-dark-body').click();
+  await expect(body).toHaveClass(/__dark/);
+  // Fondo oscuro y texto claro forzados (legibilidad WCAG 1.4.3), incluso para
+  // texto con color inline propio.
+  await expect(body).toHaveCSS('background-color', 'rgb(28, 28, 30)');
+  await expect(body).toHaveCSS('color', 'rgb(230, 230, 230)');
+  const para = page.frameLocator('#body-frame').locator('p').first();
+  await expect(para).toHaveCSS('color', 'rgb(230, 230, 230)');
+  await expect(page.locator('#btn-dark-body')).toHaveAttribute('aria-pressed', 'true');
+
+  // Copiar sin selección: vuelca todo el cuerpo conservando el formato (HTML).
+  await page.locator('#btn-copy').click();
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain('Informe');
+  expect(await app.evaluate(({ clipboard }) => clipboard.readHTML())).toMatch(/<(b|h1|p)\b/i);
+
+  // Copiar con selección: solo lo seleccionado, también con su formato.
+  await page.evaluate(() => {
+    const frame = document.querySelector('iframe') as HTMLIFrameElement;
+    const doc = frame.contentDocument!;
+    const b = doc.querySelector('b')!; // <b>Q2</b>
+    const range = doc.createRange();
+    range.selectNode(b);
+    const sel = frame.contentWindow!.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  await page.locator('#btn-copy').click();
+  expect((await app.evaluate(({ clipboard }) => clipboard.readText())).trim()).toBe('Q2');
+  expect(await app.evaluate(({ clipboard }) => clipboard.readHTML())).toMatch(/<b\b/i);
+});
+
 test('Nuevo: vuelve al estado inicial sin mensaje', async () => {
   await launch(join(FIXTURES, 'html-basic.msg'));
   await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
@@ -242,6 +287,18 @@ test('vista de código fuente: resaltado y búsqueda propios', async () => {
   await src.locator('#q').fill('boundary');
   await expect(src.locator('#count')).toContainText('1/');
   await expect(src.locator('mark.act').first()).toBeVisible();
+});
+
+test('menú Ver → código fuente abre la ventana de source', async () => {
+  await launch(join(FIXTURES, 'sample.eml'));
+  await expect(page.locator('#subject')).toHaveText('Correo EML de prueba');
+  const winPromise = app.waitForEvent('window', { timeout: 15000 });
+  // La opción de menú envía la acción 'source' al renderer (igual que el menú real).
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.webContents.send('menu-action', { type: 'source' })
+  );
+  const src = await winPromise;
+  await expect(src.locator('#hdr')).toContainText('MIME-Version');
 });
 
 test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {

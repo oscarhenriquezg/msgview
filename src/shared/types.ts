@@ -115,6 +115,8 @@ export interface MsgViewerApi {
         | { type: 'print' }
         | { type: 'find' }
         | { type: 'save-as' }
+        | { type: 'zoom'; delta: number }
+        | { type: 'source' }
         | { type: 'copy-meta'; as: 'text' | 'json' }
     ) => void
   ): void;
@@ -127,8 +129,6 @@ export interface MsgViewerApi {
   clearDocument(): Promise<void>;
   /** Vista de código fuente: cabeceras completas y cuerpo (ventana nueva). */
   viewSource(): void;
-  /** Zoom de la interfaz: delta en niveles de Chromium (±0.5 por paso). */
-  zoom(delta: number): void;
   /** Abre la ventana "Acerca de". */
   showAbout(): void;
   /**

@@ -16,6 +16,8 @@ export type MenuAction =
   | { type: 'print' }
   | { type: 'find' }
   | { type: 'save-as' }
+  | { type: 'zoom'; delta: number }
+  | { type: 'source' }
   | { type: 'copy-meta'; as: 'text' | 'json' };
 
 export interface MenuOptions {
@@ -60,6 +62,7 @@ const STRINGS = {
     zoomIn: 'Acercar',
     zoomOut: 'Alejar',
     resetZoom: 'Tamaño real',
+    source: 'Ver código fuente del mensaje',
     window: 'Ventana',
     minimize: 'Minimizar',
     maximize: 'Maximizar / Restaurar',
@@ -109,6 +112,7 @@ const STRINGS = {
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
     resetZoom: 'Actual size',
+    source: 'View message source',
     window: 'Window',
     minimize: 'Minimize',
     maximize: 'Maximize / Restore',
@@ -283,31 +287,35 @@ export function installMenu(opts: MenuOptions): void {
             {
               id: 'export-html',
               label: s.exportHtml,
+              accelerator: 'CmdOrCtrl+Shift+H',
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'html' })
             },
             {
               id: 'export-txt',
               label: s.exportTxt,
+              accelerator: 'CmdOrCtrl+Shift+T',
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'txt' })
             },
-            { type: 'separator' },
             {
               id: 'export-mht',
               label: s.exportMht,
+              accelerator: 'CmdOrCtrl+Shift+M',
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'mht' })
             },
             {
               id: 'export-json',
               label: s.exportJson,
+              accelerator: 'CmdOrCtrl+Shift+J',
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'json' })
             },
             {
               id: 'export-zip',
               label: s.exportZip,
+              accelerator: 'CmdOrCtrl+Shift+Z',
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'zip' })
             }
@@ -362,9 +370,29 @@ export function installMenu(opts: MenuOptions): void {
     {
       label: s.view,
       submenu: [
-        { role: 'zoomIn', label: s.zoomIn },
-        { role: 'zoomOut', label: s.zoomOut },
-        { role: 'resetZoom', label: s.resetZoom },
+        // El zoom afecta solo al cuerpo del mensaje (no a toda la ventana).
+        {
+          label: s.zoomIn,
+          accelerator: 'CmdOrCtrl+Plus',
+          click: () => sendToFocused({ type: 'zoom', delta: 1 })
+        },
+        {
+          label: s.zoomOut,
+          accelerator: 'CmdOrCtrl+-',
+          click: () => sendToFocused({ type: 'zoom', delta: -1 })
+        },
+        {
+          label: s.resetZoom,
+          accelerator: 'CmdOrCtrl+0',
+          click: () => sendToFocused({ type: 'zoom', delta: 0 })
+        },
+        { type: 'separator' },
+        {
+          id: 'view-source',
+          label: s.source,
+          enabled: false,
+          click: () => sendToFocused({ type: 'source' })
+        },
         // Solo en desarrollo y sin presencia visible (confunden al usuario):
         // accesibles por atajo para depurar.
         ...(isDev
@@ -456,7 +484,8 @@ export function setExportEnabled(enabled: boolean): void {
     'print',
     'copy-meta',
     'copy-meta-json',
-    'save-as'
+    'save-as',
+    'view-source'
   ]) {
     const item = menu?.getMenuItemById(id);
     if (item) item.enabled = enabled;

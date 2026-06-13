@@ -512,17 +512,6 @@ function registerIpc(): void {
     setExportEnabled(false);
   });
 
-  // Zoom de la interfaz (botones +/− de la barra).
-  ipcMain.on('zoom', (e, delta: number) => {
-    if (typeof delta !== 'number' || !Number.isFinite(delta)) return;
-    if (delta === 0) {
-      e.sender.setZoomLevel(0); // reset al 100%
-      return;
-    }
-    const level = e.sender.getZoomLevel() + Math.sign(delta) * 0.5;
-    e.sender.setZoomLevel(Math.max(-3, Math.min(3, level)));
-  });
-
   // Vista de código fuente: cabeceras completas + cuerpo (análisis técnico).
   ipcMain.on('view-source', (e) => {
     const state = docs.get(e.sender.id);
