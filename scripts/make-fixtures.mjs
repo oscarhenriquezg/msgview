@@ -78,20 +78,30 @@ function buildMsg({ subject, senderName, senderEmail, bodyHtml, bodyText, compre
  * no latino, con PR_MESSAGE_CODEPAGE (3FFD0003) declarado en el property stream.
  * Sirve para verificar que el parser evita el mojibake (no asume latin1).
  */
-function buildAnsiMsg({ subject, bodyText, codepage }) {
+function buildAnsiMsg({ subject, bodyText, senderName, senderEmail, recipients = [], codepage }) {
   const cfb = CFB.utils.cfb_new();
   const add = (path, content) => CFB.utils.cfb_add(cfb, path, content);
-  // Property stream raíz: cabecera de 32 bytes + 1 entrada de 16 bytes con
-  // PR_MESSAGE_CODEPAGE (tag 0x3FFD0003, tipo integer).
-  const header = Buffer.alloc(32);
+  const ansi = (s) => iconv.encode(s, `cp${codepage}`);
+  // Property stream raíz: cabecera de 32 bytes (con recipientCount) + 1 entrada
+  // de 16 bytes con PR_MESSAGE_CODEPAGE (tag 0x3FFD0003, tipo integer).
+  const header = propertiesStream(32, { recipientCount: recipients.length });
   const entry = Buffer.alloc(16);
   entry.writeUInt32LE(0x3ffd0003, 0); // propertyTag
   entry.writeUInt32LE(0x06, 4); // flags
   entry.writeUInt32LE(codepage, 8); // valor int32 = codepage
   add('/__properties_version1.0', Buffer.concat([header, entry]));
   add('/__substg1.0_001A001F', utf16('IPM.Note'));
-  add(`/__substg1.0_0037001E`, iconv.encode(subject, `cp${codepage}`)); // subject ANSI
-  add(`/__substg1.0_1000001E`, iconv.encode(bodyText, `cp${codepage}`)); // body ANSI
+  add('/__substg1.0_0037001E', ansi(subject)); // subject ANSI
+  add('/__substg1.0_1000001E', ansi(bodyText)); // body ANSI
+  if (senderName) add('/__substg1.0_0C1A001E', ansi(senderName)); // sender name ANSI
+  if (senderEmail) add('/__substg1.0_5D01001F', utf16(senderEmail)); // sender SMTP (ASCII)
+
+  recipients.forEach((r, i) => {
+    const p = `/__recip_version1.0_#${i.toString(16).toUpperCase().padStart(8, '0')}`;
+    add(`${p}/__properties_version1.0`, propertiesStream(8));
+    add(`${p}/__substg1.0_3001001E`, ansi(r.name)); // display name ANSI
+    add(`${p}/__substg1.0_39FE001F`, utf16(r.email)); // SMTP (ASCII)
+  });
   return Buffer.from(CFB.write(cfb, { type: 'buffer' }));
 }
 
@@ -139,6 +149,9 @@ writeFileSync(join(outDir, 'html-basic.msg'), buildMsg({
 writeFileSync(join(outDir, 'ansi-cyrillic.msg'), buildAnsiMsg({
   subject: 'Привет, отчёт',
   bodyText: 'Текст письма в кодировке Windows-1251.',
+  senderName: 'Иван Петров',
+  senderEmail: 'ivan.petrov@example.ru',
+  recipients: [{ name: 'Мария Сидорова', email: 'maria@example.ru' }],
   codepage: 1251
 }));
 

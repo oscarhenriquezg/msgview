@@ -29,9 +29,15 @@ describe('MsgAdapter — archivos válidos', () => {
     const result = parse('ansi-cyrillic.msg');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    const { metadata, bodyHtml } = result.document;
     // Sin aplicar el codepage 1251 estos textos cirílicos saldrían como mojibake.
-    expect(result.document.metadata.subject).toBe('Привет, отчёт');
-    expect(result.document.bodyHtml).toContain('кодировке Windows-1251');
+    expect(metadata.subject).toBe('Привет, отчёт');
+    expect(bodyHtml).toContain('кодировке Windows-1251');
+    // Nombres ANSI de remitente y destinatario también decodificados (no vacíos).
+    expect(metadata.from.name).toBe('Иван Петров');
+    expect(metadata.from.email).toBe('ivan.petrov@example.ru');
+    expect(metadata.recipients[0]?.name).toBe('Мария Сидорова');
+    expect(metadata.recipients[0]?.email).toBe('maria@example.ru');
   });
 
   it('destinatarios de Exchange: prefiere SMTP y omite el DN X.500', () => {
