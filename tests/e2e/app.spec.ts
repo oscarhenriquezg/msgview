@@ -207,21 +207,35 @@ test('búsqueda en el mensaje (Ctrl+F) con contador', async () => {
   await expect(page.locator('#findbar')).toBeHidden();
 });
 
-test('clic en enlace: advertencia antes de salir del visor', async () => {
+test('clic en enlace: advertencia (diálogo propio) antes de salir del visor', async () => {
   await launch(join(FIXTURES, 'html-basic.msg'));
   await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
-  // Acepta la advertencia y captura la URL que se abriría externamente.
-  await app.evaluate(({ dialog, shell }) => {
+  await app.evaluate(({ shell }) => {
     (globalThis as { __opened?: string }).__opened = '';
-    dialog.showMessageBox = (async () => ({ response: 1, checkboxChecked: false })) as never;
     shell.openExternal = (async (url: string) => {
       (globalThis as { __opened?: string }).__opened = url;
     }) as never;
   });
   await page.frameLocator('#body-frame').locator('a', { hasText: 'Ver detalle' }).click();
+  // El diálogo propio muestra la URL en una caja (no se abre nada todavía).
+  await expect(page.locator('#leave-dialog')).toBeVisible();
+  await expect(page.locator('#leave-url')).toHaveValue('https://intranet.example.com/q2');
+  expect(await app.evaluate(() => (globalThis as { __opened?: string }).__opened)).toBe('');
+  // Confirmar abre el enlace en el navegador.
+  await page.locator('#btn-leave-open').click();
   await expect
     .poll(() => app.evaluate(() => (globalThis as { __opened?: string }).__opened))
     .toBe('https://intranet.example.com/q2');
+});
+
+test('el menú Exportar se cierra al hacer clic en el cuerpo del mensaje', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  await page.locator('#btn-export').click();
+  await expect(page.locator('#export-menu')).toBeVisible();
+  // Interacción dentro del iframe del cuerpo: el menú debe ocultarse.
+  await page.frameLocator('#body-frame').locator('body').dispatchEvent('mousedown');
+  await expect(page.locator('#export-menu')).toBeHidden();
 });
 
 test('búsqueda propia desplaza hasta la coincidencia activa', async () => {

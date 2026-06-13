@@ -668,10 +668,11 @@ function registerIpc(): void {
     showAbout(BrowserWindow.fromWebContents(e.sender));
   });
 
-  // Advertencia anti-phishing al salir del visor (clic en un enlace).
-  ipcMain.on('open-external', (e, url: string) => {
-    const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win || typeof url !== 'string') return;
+  // Abre el enlace externo en el navegador. La confirmación anti-phishing la
+  // muestra el renderer (diálogo propio con la URL en una caja, sin deformarse);
+  // aquí solo se revalida el protocolo antes de salir del visor.
+  ipcMain.on('open-external', (_e, url: string) => {
+    if (typeof url !== 'string') return;
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -679,27 +680,7 @@ function registerIpc(): void {
       return;
     }
     if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return;
-    const es = app.getLocale().startsWith('es');
-    void dialog
-      .showMessageBox(win, {
-        type: 'warning',
-        title: es ? 'Salir del visor' : 'Leaving the viewer',
-        message: es ? 'Vas a abrir un enlace externo' : 'You are about to open an external link',
-        detail:
-          (es
-            ? 'Esto saldrá del visor hacia:\n\n'
-            : 'This will leave the viewer and open:\n\n') +
-          url +
-          (es
-            ? '\n\nVerifica que la dirección es de confianza antes de continuar.'
-            : '\n\nMake sure you trust this address before continuing.'),
-        buttons: [es ? 'Cancelar' : 'Cancel', es ? 'Abrir en el navegador' : 'Open in browser'],
-        defaultId: 0,
-        cancelId: 0
-      })
-      .then(({ response }) => {
-        if (response === 1) void shell.openExternal(url);
-      });
+    void shell.openExternal(url);
   });
 
   ipcMain.on('show-in-folder', (_e, path: string) => {

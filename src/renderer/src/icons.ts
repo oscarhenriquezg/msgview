@@ -11,6 +11,7 @@ import folderOpen from 'lucide-static/icons/folder-open.svg?raw';
 import origami from 'lucide-static/icons/origami.svg?raw';
 import printer from 'lucide-static/icons/printer.svg?raw';
 import save from 'lucide-static/icons/save.svg?raw';
+import shieldAlert from 'lucide-static/icons/shield-alert.svg?raw';
 import shieldCheck from 'lucide-static/icons/shield-check.svg?raw';
 import squareCode from 'lucide-static/icons/square-code.svg?raw';
 import squareDashedText from 'lucide-static/icons/square-dashed-text.svg?raw';
@@ -32,6 +33,7 @@ export const ICONS = {
   darkBody: contrast,
   unlink,
   shield: shieldCheck,
+  shieldAlert,
   metaJson: braces,
   metaTxt: squareDashedText,
   source: squareCode,

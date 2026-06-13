@@ -25,6 +25,8 @@ const el = {
   bodyFrame: $<HTMLIFrameElement>('body-frame'),
   exportMenu: $('export-menu'),
   pngDialog: $<HTMLDialogElement>('png-dialog'),
+  leaveDialog: $<HTMLDialogElement>('leave-dialog'),
+  leaveUrl: $<HTMLTextAreaElement>('leave-url'),
   pngTargetDialog: $<HTMLDialogElement>('png-target-dialog'),
   toasts: $('toasts'),
   findbar: $('findbar'),
@@ -308,6 +310,9 @@ function renderBody(sanitizedHtml: string): void {
   el.bodyFrame.onload = () => {
     const doc = el.bodyFrame.contentDocument;
     if (!doc) return;
+    // Los clics dentro del iframe no llegan al documento padre: hay que cerrar
+    // aquí los menús desplegables abiertos (p. ej. Exportar).
+    doc.addEventListener('mousedown', () => closeExportMenu());
     doc.addEventListener('dragover', (e) => e.preventDefault());
     doc.addEventListener('drop', (e) => {
       e.preventDefault();
@@ -343,7 +348,7 @@ function renderBody(sanitizedHtml: string): void {
       e.preventDefault();
       if (linksDisabled) return;
       const href = a.getAttribute('href') ?? '';
-      if (/^(https?:|mailto:)/i.test(href)) api.openExternal(href);
+      if (/^(https?:|mailto:)/i.test(href)) confirmLeave(href);
     });
     markLinkDiscrepancies(doc);
     applyLinkState();
@@ -439,6 +444,19 @@ function markLinkDiscrepancies(doc: Document): void {
       );
     }
   }
+}
+
+/** URL pendiente de confirmar en el diálogo "Salir del visor". */
+let pendingLeaveUrl = '';
+
+/** Confirmación anti-phishing antes de abrir un enlace externo (FR-08). */
+function confirmLeave(url: string): void {
+  pendingLeaveUrl = url;
+  el.leaveUrl.value = url;
+  el.leaveUrl.scrollTop = 0;
+  el.leaveDialog.showModal();
+  // El foco arranca en Cancelar (acción segura por defecto).
+  $('btn-leave-cancel').focus();
 }
 
 // ---------------------------------------------------------------------------
@@ -857,6 +875,12 @@ async function init(): Promise<void> {
   $('unlink-body').textContent = t('unlink.body');
   $('btn-unlink-confirm').textContent = t('unlink.confirm');
   $('btn-unlink-cancel').textContent = t('unlink.cancel');
+  $('leave-icon').innerHTML = ICONS.shieldAlert;
+  $('leave-title').textContent = t('leave.title');
+  $('leave-body').textContent = t('leave.body');
+  $('leave-warn').textContent = t('leave.warn');
+  $('btn-leave-open').textContent = t('leave.open');
+  $('btn-leave-cancel').textContent = t('leave.cancel');
   const btnExport = $('btn-export');
   btnExport.innerHTML = `${t('actions.export')} ${ICONS.export}`;
   btnExport.title = t('actions.export');
@@ -913,6 +937,15 @@ async function init(): Promise<void> {
   $('btn-unlink-cancel').addEventListener('click', () =>
     ($('unlink-dialog') as HTMLDialogElement).close()
   );
+  $('btn-leave-open').addEventListener('click', () => {
+    el.leaveDialog.close();
+    if (pendingLeaveUrl) api.openExternal(pendingLeaveUrl);
+    pendingLeaveUrl = '';
+  });
+  $('btn-leave-cancel').addEventListener('click', () => {
+    el.leaveDialog.close();
+    pendingLeaveUrl = '';
+  });
   $('btn-meta-json').addEventListener('click', () => copyMetadata('json'));
   $('btn-meta-txt').addEventListener('click', () => copyMetadata('text'));
   $('btn-source').addEventListener('click', () => api.viewSource());

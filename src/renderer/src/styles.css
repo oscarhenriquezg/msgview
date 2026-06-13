@@ -305,6 +305,27 @@ dialog p { font-size: 13.5px; }
   gap: 8px;
   margin-top: 16px;
 }
+/* URL del enlace externo: caja de ancho fijo; las URLs largas ajustan/scrollean
+   en vez de ensanchar el diálogo. */
+.url-box {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 7.5em;
+  margin: 4px 0 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--chip-bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.4;
+  resize: none;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.url-box:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* ---------- Búsqueda (Ctrl+F) ---------- */
 .findbar {
