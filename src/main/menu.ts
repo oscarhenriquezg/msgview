@@ -70,7 +70,7 @@ const STRINGS = {
     aboutDetail:
       'Visor ligero y 100% offline de archivos .msg de Outlook para Linux y macOS.\n' +
       'Tu correo nunca sale de tu equipo: sin red, sin telemetría, sin nubes.\n\n' +
-      '© 2026 Oscar Henríquez · Licencia MIT',
+      '© 2026 Oscar Henríquez · Licencia GPL-3.0',
     eggTitle: '🐣 ¡Lo encontraste!',
     eggMessage: 'Dato friki',
     eggDetail:
@@ -119,7 +119,7 @@ const STRINGS = {
     aboutDetail:
       'Lightweight, 100% offline viewer for Outlook .msg files on Linux and macOS.\n' +
       'Your mail never leaves your machine: no network, no telemetry, no clouds.\n\n' +
-      '© 2026 Oscar Henríquez · MIT License',
+      '© 2026 Oscar Henríquez · GPL-3.0 License',
     eggTitle: '🐣 You found it!',
     eggMessage: 'Nerd fact',
     eggDetail:

@@ -16,7 +16,7 @@
   },
   "keywords": [],
   "author": "Oscar Henríquez <oscar.henriquez.gonzalez@gmail.com>",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "devDependencies": {
     "@eslint/js": "^10.0.1",

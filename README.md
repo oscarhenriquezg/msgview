@@ -106,4 +106,29 @@ escritura a disco viven exclusivamente en main. Especificación completa en
 
 ## Licencia
 
-MIT © 2026 Oscar Henríquez
+© 2026 Oscar Henríquez. Publicado bajo la **GNU General Public License v3.0
+(o posterior)**. El texto completo está en [LICENSE.md](LICENSE.md).
+
+Política de seguridad y reporte de vulnerabilidades: [SECURITY.md](SECURITY.md).
+
+### Software de terceros
+
+MSG Viewer usa las siguientes bibliotecas de código abierto. Todas sus
+licencias son compatibles con la GPL-3.0. Cada una conserva su licencia y sus
+derechos de autor originales.
+
+| Dependencia | Uso | Licencia |
+| --- | --- | --- |
+| [Electron](https://github.com/electron/electron) | Entorno de ejecución de escritorio | MIT |
+| [@kenjiuno/msgreader](https://github.com/HiraokaHyperTools/msgreader) | Lectura de archivos `.msg` (CFBF/MAPI) | Apache-2.0 |
+| [@kenjiuno/decompressrtf](https://github.com/HiraokaHyperTools/decompressRTF) | Descompresión de RTF comprimido | BSD-2-Clause |
+| [rtf-stream-parser](https://github.com/mazira/rtf-stream-parser) | Des-encapsulación de HTML/RTF | MIT |
+| [mailparser](https://github.com/nodemailer/mailparser) | Lectura de archivos `.eml`/`.emlx` (MIME) | MIT |
+| [DOMPurify](https://github.com/cure53/DOMPurify) | Sanitización del HTML del correo | MPL-2.0 OR Apache-2.0 |
+| [jsdom](https://github.com/jsdom/jsdom) | DOM para DOMPurify en el proceso main | MIT |
+| [iconv-lite](https://github.com/ashtuchkin/iconv-lite) | Decodificación de juegos de caracteres heredados | MIT |
+| [archiver](https://github.com/archiverjs/node-archiver) | Generación de exportaciones ZIP | MIT |
+| [Lucide](https://lucide.dev) (`lucide-static`) | Iconos de la interfaz (inlineados en el build) | ISC |
+
+> El listado completo de licencias de la cadena de dependencias —incluidas las
+> de desarrollo— puede generarse con `npx license-checker --production`.
