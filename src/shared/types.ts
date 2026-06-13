@@ -67,7 +67,8 @@ export type LoadResult =
   | { ok: true; document: MsgDocument }
   | { ok: false; error: LoadError };
 
-export type ExportFormat = 'pdf' | 'eml' | 'png' | 'html' | 'txt' | 'mht' | 'json' | 'zip';
+export type ExportFormat =
+  | 'pdf' | 'eml' | 'png' | 'html' | 'txt' | 'md' | 'mht' | 'json' | 'zip';
 
 export interface ExportRequest {
   format: ExportFormat;
@@ -142,6 +143,8 @@ export interface MsgViewerApi {
   copyText(text: string): void;
   /** Menú nativo Abrir/Guardar para un adjunto (clic en el chip). */
   showAttachmentMenu(attachmentId: number): void;
+  /** Arrastrar un adjunto fuera de la app (drag-out nativo a archivos/correo). */
+  startAttachmentDrag(attachmentId: number): void;
   /** main → renderer: notificaciones para mostrar como toast (UI-06). */
   onToast(cb: (t: { message: string; path?: string; isError?: boolean }) => void): void;
   /** Locale del sistema para i18n (UI-05). */

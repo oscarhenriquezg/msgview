@@ -1,4 +1,4 @@
-import type { LoadResult, MsgAttachmentMeta, MsgDocument } from '@shared/types';
+import type { ExportFormat, LoadResult, MsgAttachmentMeta, MsgDocument } from '@shared/types';
 import { MAX_PNG_HEIGHT } from '@shared/types';
 import { ICONS } from './icons';
 import { initI18n, locale, t } from './i18n';
@@ -223,10 +223,17 @@ function makeChip(a: MsgAttachmentMeta): HTMLElement {
   chip.setAttribute('role', 'listitem');
   // Clic en cualquier parte del chip: menú nativo Abrir / Guardar.
   chip.tabIndex = 0;
-  chip.title = a.fileName;
+  chip.title = `${a.fileName} — ${t('attachments.dragHint')}`;
   chip.addEventListener('click', () => api.showAttachmentMenu(a.id));
   chip.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') api.showAttachmentMenu(a.id);
+  });
+  // Arrastrar el chip fuera de la app: el drag nativo lo inicia el proceso main
+  // (se cancela el DnD HTML para no soltar el adjunto sobre la propia ventana).
+  chip.draggable = true;
+  chip.addEventListener('dragstart', (e) => {
+    e.preventDefault();
+    api.startAttachmentDrag(a.id);
   });
 
   const icon = document.createElement('span');
@@ -338,6 +345,7 @@ function renderBody(sanitizedHtml: string): void {
       const href = a.getAttribute('href') ?? '';
       if (/^(https?:|mailto:)/i.test(href)) api.openExternal(href);
     });
+    markLinkDiscrepancies(doc);
     applyLinkState();
     applyBodyView();
   };
@@ -353,6 +361,12 @@ function renderBody(sanitizedHtml: string): void {
   mark.__find { background: #ffe066; color: inherit; padding: 0; }
   mark.__find.__find-active { background: #ff9632; outline: 2px solid #ff9632; }
   body.__nolinks a { pointer-events: none; opacity: 0.55; text-decoration: line-through; }
+  /* Anti-phishing: el texto del enlace muestra un dominio distinto al real. */
+  a.__link-mismatch {
+    outline: 2px solid #d93025; outline-offset: 1px; border-radius: 2px;
+    background: #fde7e6; text-decoration: underline wavy #d93025;
+  }
+  a.__link-mismatch::after { content: " \\26A0"; color: #d93025; font-size: 0.9em; }
   /* Accesibilidad (WCAG 1.4.3): modo oscuro forzado. Se imponen fondo oscuro y
      texto claro con !important, que gana a los colores inline del correo
      (pensados para fondo claro y que de otro modo quedarían ilegibles). Así se
@@ -370,6 +384,61 @@ function renderBody(sanitizedHtml: string): void {
 </head>
 <body>${sanitizedHtml}</body>
 </html>`;
+}
+
+// ---------------------------------------------------------------------------
+// Anti-phishing: discrepancia entre el texto visible del enlace y su URL real
+// ---------------------------------------------------------------------------
+
+/** Host normalizado (minúsculas, sin "www.") de una URL http/https. */
+function hostOf(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return u.hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+/** Host que el texto visible aparenta mostrar, si parece un dominio/URL. */
+function displayedHost(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  // Si el texto es una URL completa, usar su host.
+  const asUrl = hostOf(trimmed);
+  if (asUrl) return asUrl;
+  // Si no, buscar un dominio suelto (etiqueta.tld) dentro del texto.
+  const m = trimmed.match(/\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i);
+  return m ? m[1]!.toLowerCase().replace(/^www\./, '') : '';
+}
+
+/** ¿Son hosts distintos sin relación de subdominio (p. ej. paypal.com vs evil.com)? */
+function hostsDiffer(shown: string, real: string): boolean {
+  if (!shown || !real || shown === real) return false;
+  return !real.endsWith('.' + shown) && !shown.endsWith('.' + real);
+}
+
+/**
+ * Marca los enlaces cuyo texto visible aparenta un dominio distinto al host
+ * real del href (técnica de phishing). El texto que no aparenta un dominio
+ * (p. ej. "ver detalle") no se marca, para evitar falsos positivos.
+ */
+function markLinkDiscrepancies(doc: Document): void {
+  for (const a of Array.from(doc.querySelectorAll('a[href]'))) {
+    const real = hostOf(a.getAttribute('href') ?? '');
+    if (!real) continue; // solo http/https
+    // Si el enlace contiene una imagen, el "texto" no es fiable: omitir.
+    if (a.querySelector('img')) continue;
+    const shown = displayedHost(a.textContent ?? '');
+    if (hostsDiffer(shown, real)) {
+      a.classList.add('__link-mismatch');
+      a.setAttribute(
+        'title',
+        `${t('link.mismatch')}: ${t('link.shows')} "${shown}" · ${t('link.goesTo')} ${real}`
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +492,7 @@ async function saveAttachments(ids?: number[]): Promise<void> {
 let pngTarget: 'file' | 'clipboard' = 'file';
 
 async function exportDocument(
-  format: 'pdf' | 'eml' | 'png' | 'html' | 'txt' | 'mht' | 'json' | 'zip',
+  format: ExportFormat,
   acceptTruncation = false,
   target: 'file' | 'clipboard' = 'file'
 ): Promise<void> {
@@ -447,7 +516,7 @@ async function doSaveAs(): Promise<void> {
 
 /** Formatos del menú Exportar, en el mismo orden que el menú de aplicación. */
 const EXPORT_FORMATS = [
-  'pdf', 'eml', 'png', 'html', 'txt', 'mht', 'json', 'zip'
+  'pdf', 'eml', 'png', 'html', 'txt', 'md', 'mht', 'json', 'zip'
 ] as const;
 
 /** Botón PNG: diálogo para elegir entre guardar a archivo o copiar imagen. */

@@ -32,6 +32,7 @@ const api: MsgViewerApi & { openDroppedFile(file: File): Promise<LoadResult> } =
   openExternal: (url) => ipcRenderer.send('open-external', url),
   printDocument: () => ipcRenderer.invoke('print'),
   showAttachmentMenu: (attachmentId) => ipcRenderer.send('attachment-menu', attachmentId),
+  startAttachmentDrag: (attachmentId) => ipcRenderer.send('attachment-drag', attachmentId),
   onToast: (cb) => {
     ipcRenderer.on('toast', (_event, t) => cb(t));
   },

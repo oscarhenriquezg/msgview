@@ -42,6 +42,7 @@ const STRINGS = {
     exportPng: 'Exportar a PNG…',
     exportHtml: 'Exportar a HTML…',
     exportTxt: 'Exportar a TXT…',
+    exportMd: 'Exportar a Markdown…',
     exportMht: 'Exportar a MHT (web)…',
     exportJson: 'Exportar a JSON…',
     exportZip: 'Exportar a ZIP (con adjuntos)…',
@@ -92,6 +93,7 @@ const STRINGS = {
     exportPng: 'Export to PNG…',
     exportHtml: 'Export to HTML…',
     exportTxt: 'Export to TXT…',
+    exportMd: 'Export to Markdown…',
     exportMht: 'Export to MHT (web)…',
     exportJson: 'Export to JSON…',
     exportZip: 'Export to ZIP (with attachments)…',
@@ -299,6 +301,13 @@ export function installMenu(opts: MenuOptions): void {
               click: () => sendToFocused({ type: 'export', format: 'txt' })
             },
             {
+              id: 'export-md',
+              label: s.exportMd,
+              accelerator: 'CmdOrCtrl+Shift+D',
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'md' })
+            },
+            {
               id: 'export-mht',
               label: s.exportMht,
               accelerator: 'CmdOrCtrl+Shift+M',
@@ -478,6 +487,7 @@ export function setExportEnabled(enabled: boolean): void {
     'export-png',
     'export-html',
     'export-txt',
+    'export-md',
     'export-mht',
     'export-json',
     'export-zip',

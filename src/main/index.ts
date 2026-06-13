@@ -1,10 +1,11 @@
 import { rmSync } from 'node:fs';
 import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, protocol, session, shell } from 'electron';
 import type {
   AttachmentSaveRequest,
   AttachmentSaveResult,
+  ExportFormat,
   ExportRequest,
   ExportResult,
   LoadResult,
@@ -22,6 +23,7 @@ import {
 } from './export/exporter';
 import { buildPrintableHtml } from './export/printable';
 import { documentToText } from './export/textout';
+import { documentToMarkdown } from './export/markdown';
 import { documentToJson, exportMht, exportZip } from './export/bundle';
 import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled, showAbout } from './menu';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
@@ -62,6 +64,76 @@ const sourceDocs = new Map<
   number,
   { headers: string; body: string; pageHtml: string; baseName: string }
 >();
+
+// Formatos de exportación: una sola fuente para "Exportar" y "Guardar como"
+// (congruencia). El orden coincide con el del menú y el desplegable.
+const EXPORT_FILTERS: Electron.FileFilter[] = [
+  { name: 'PDF', extensions: ['pdf'] },
+  { name: 'EML', extensions: ['eml'] },
+  { name: 'PNG', extensions: ['png'] },
+  { name: 'HTML', extensions: ['html', 'htm'] },
+  { name: 'TXT', extensions: ['txt'] },
+  { name: 'Markdown', extensions: ['md', 'markdown'] },
+  { name: 'MHT', extensions: ['mht', 'mhtml'] },
+  { name: 'JSON', extensions: ['json'] },
+  { name: 'ZIP', extensions: ['zip'] }
+];
+
+/** Extensión de archivo → formato de exportación (null si no es un formato). */
+function formatFromExtension(ext: string): ExportFormat | null {
+  switch (ext.replace('.', '').toLowerCase()) {
+    case 'pdf': return 'pdf';
+    case 'eml': return 'eml';
+    case 'png': return 'png';
+    case 'html': case 'htm': return 'html';
+    case 'txt': return 'txt';
+    case 'md': case 'markdown': return 'md';
+    case 'mht': case 'mhtml': return 'mht';
+    case 'json': return 'json';
+    case 'zip': return 'zip';
+    default: return null;
+  }
+}
+
+/** Genera el archivo de exportación en filePath. Compartida por export/save-as. */
+async function exportToPath(
+  state: WindowDocument,
+  format: ExportFormat,
+  filePath: string,
+  pngAcceptTruncation: boolean
+): Promise<ExportResult> {
+  const doc = state.document;
+  const locale = app.getLocale();
+  switch (format) {
+    case 'pdf':
+      return exportPdf(doc, filePath);
+    case 'eml':
+      if (!isCfbf(state.buffer)) {
+        // El origen ya es RFC 5322: copia byte a byte.
+        await writeFile(filePath, state.buffer);
+        return { ok: true, filePath };
+      }
+      return exportEml(state.buffer, filePath);
+    case 'png':
+      return exportPng(doc, filePath, pngAcceptTruncation);
+    case 'html':
+      await writeFile(filePath, buildPrintableHtml(doc, locale), 'utf-8');
+      return { ok: true, filePath };
+    case 'txt':
+      await writeFile(filePath, documentToText(doc), 'utf-8');
+      return { ok: true, filePath };
+    case 'md':
+      await writeFile(filePath, documentToMarkdown(doc), 'utf-8');
+      return { ok: true, filePath };
+    case 'mht':
+      return exportMht(doc, state.buffer, filePath, buildPrintableHtml(doc, locale));
+    case 'json':
+      await writeFile(filePath, documentToJson(doc), 'utf-8');
+      return { ok: true, filePath };
+    case 'zip':
+      return exportZip(doc, state.buffer, filePath, isCfbf(state.buffer), buildPrintableHtml(doc, locale));
+  }
+}
 
 // Tests E2E: userData propio para no colisionar con una instancia en uso
 // (el lock de instancia única vive en userData).
@@ -340,6 +412,28 @@ function registerIpc(): void {
     Menu.buildFromTemplate(items).popup({ window: win });
   });
 
+  // Arrastrar un adjunto fuera de la app: se extrae a un temporal y se inicia
+  // el drag nativo, que el SO suelta como archivo en el destino (Dolphin,
+  // Finder, un correo nuevo…). La extracción sigue siendo explícita (NFR-03).
+  ipcMain.on('attachment-drag', async (e, attachmentId: number) => {
+    const state = docs.get(e.sender.id);
+    if (!state) return;
+    const data = await getAnyAttachment(state.buffer, attachmentId);
+    if (!data) return;
+    try {
+      const dir = await mkdtemp(join(app.getPath('temp'), 'msg-viewer-drag-'));
+      tempDirs.add(dir);
+      const filePath = join(dir, basename(data.fileName) || 'adjunto');
+      await writeFile(filePath, data.content);
+      let icon = nativeImage.createFromPath(APP_ICON_PATH);
+      if (icon.isEmpty()) icon = nativeImage.createEmpty();
+      else icon = icon.resize({ width: 64, height: 64 });
+      e.sender.startDrag({ file: filePath, icon });
+    } catch {
+      // Un fallo de drag no debe romper la ventana; se ignora en silencio.
+    }
+  });
+
   // FR-10: extracción de adjuntos solo por acción explícita (NFR-03).
   ipcMain.handle(
     'attachments:save',
@@ -417,38 +511,7 @@ function registerIpc(): void {
     });
     if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
 
-    switch (req.format) {
-      case 'pdf':
-        return exportPdf(doc, filePath);
-      case 'eml':
-        if (!isCfbf(state.buffer)) {
-          // El origen ya es RFC 5322: copia byte a byte.
-          await writeFile(filePath, state.buffer);
-          return { ok: true, filePath };
-        }
-        return exportEml(state.buffer, filePath);
-      case 'png':
-        return exportPng(doc, filePath, req.acceptTruncation ?? false);
-      case 'html':
-        await writeFile(filePath, buildPrintableHtml(doc, app.getLocale()), 'utf-8');
-        return { ok: true, filePath };
-      case 'txt':
-        await writeFile(filePath, documentToText(doc), 'utf-8');
-        return { ok: true, filePath };
-      case 'mht':
-        return exportMht(doc, state.buffer, filePath, buildPrintableHtml(doc, app.getLocale()));
-      case 'json':
-        await writeFile(filePath, documentToJson(doc), 'utf-8');
-        return { ok: true, filePath };
-      case 'zip':
-        return exportZip(
-          doc,
-          state.buffer,
-          filePath,
-          isCfbf(state.buffer),
-          buildPrintableHtml(doc, app.getLocale())
-        );
-    }
+    return exportToPath(state, req.format, filePath, req.acceptTruncation ?? false);
   });
 
   // FR adicional: impresión con diálogo del sistema (menú Archivo).
@@ -458,47 +521,28 @@ function registerIpc(): void {
     return printDocument(state.document);
   });
 
-  // "Guardar como": original / PDF / EML / PNG / HTML / TXT según extensión.
+  // "Guardar como": mismos formatos que Exportar (congruencia) + el original.
   ipcMain.handle('save-as', async (e): Promise<ExportResult> => {
     const state = docs.get(e.sender.id);
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!state || !win) return { ok: false, reason: 'error', detail: 'Sin documento' };
     const sourceName = basename(state.document.sourcePath) || 'mensaje.msg';
-    const sourceExt = extname(sourceName).replace('.', '') || 'msg';
+    const sourceExt = extname(sourceName).replace('.', '').toLowerCase() || 'msg';
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       defaultPath: sourceName,
       filters: [
         { name: `Original (.${sourceExt})`, extensions: [sourceExt] },
-        { name: 'PDF', extensions: ['pdf'] },
-        { name: 'EML', extensions: ['eml'] },
-        { name: 'PNG', extensions: ['png'] },
-        { name: 'HTML', extensions: ['html'] },
-        { name: 'TXT', extensions: ['txt'] }
+        ...EXPORT_FILTERS
       ]
     });
     if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
     try {
-      switch (extname(filePath).toLowerCase()) {
-        case '.pdf':
-          return await exportPdf(state.document, filePath);
-        case '.png':
-          return await exportPng(state.document, filePath, true);
-        case '.eml':
-          if (!isCfbf(state.buffer)) {
-            await writeFile(filePath, state.buffer);
-            return { ok: true, filePath };
-          }
-          return await exportEml(state.buffer, filePath);
-        case '.html':
-          await writeFile(filePath, buildPrintableHtml(state.document, app.getLocale()), 'utf-8');
-          return { ok: true, filePath };
-        case '.txt':
-          await writeFile(filePath, documentToText(state.document), 'utf-8');
-          return { ok: true, filePath };
-        default:
-          await writeFile(filePath, state.buffer);
-          return { ok: true, filePath };
-      }
+      const format = formatFromExtension(extname(filePath));
+      // PNG en "Guardar como" no pregunta por truncado: se acepta sin más.
+      if (format) return await exportToPath(state, format, filePath, true);
+      // Extensión del original o desconocida: copia byte a byte del buffer.
+      await writeFile(filePath, state.buffer);
+      return { ok: true, filePath };
     } catch (err) {
       return { ok: false, reason: 'error', detail: err instanceof Error ? err.message : String(err) };
     }

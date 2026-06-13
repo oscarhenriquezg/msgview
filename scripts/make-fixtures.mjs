@@ -113,6 +113,20 @@ writeFileSync(join(outDir, 'html-basic.msg'), buildMsg({
   ]
 }));
 
+writeFileSync(join(outDir, 'phishing-link.msg'), buildMsg({
+  subject: 'Verifica tu cuenta',
+  senderName: 'Soporte',
+  senderEmail: 'soporte@phish.example',
+  // Un enlace engañoso (texto muestra paypal.com, va a evil) y uno honesto.
+  bodyHtml: '<html><body>' +
+    '<p><a id="bad" href="http://evil-phish.example/login">www.paypal.com</a></p>' +
+    '<p><a id="ok" href="https://www.paypal.com/account">Ir a mi cuenta</a></p>' +
+    '<p><a id="plain" href="https://intranet.example.com/x">ver aquí</a></p>' +
+    '</body></html>',
+  bodyText: 'Verifica tu cuenta',
+  recipients: [{ name: 'Víctima', email: 'victima@example.com', type: 'to' }]
+}));
+
 writeFileSync(join(outDir, 'inline-image.msg'), buildMsg({
   subject: 'Con imagen inline',
   senderName: 'Ana Pérez',

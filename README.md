@@ -29,6 +29,7 @@ nunca abandona tu equipo.
 | **Contenido hostil** | El cuerpo se sanitiza (DOMPurify) y se aísla en un iframe sandbox sin scripts + CSP restrictiva |
 | **Sin red** | Bloqueo total de tráfico saliente en capa de sesión (verificable con `tcpdump`). Cero telemetría |
 | **Anti-phishing** | La URL real de cada enlace se ve al pasar el cursor; el clic exige confirmar antes de salir al navegador |
+| **Enlaces engañosos** | Se resaltan los enlaces cuyo texto aparenta un dominio distinto al destino real (`<a>paypal.com</a>` → `evil.com`) |
 | **Unlink** | Un botón deja todos los enlaces inertes (tachados) para inspeccionar correos sospechosos sin riesgo |
 | **Adjuntos bajo control** | Solo se escriben a disco por acción explícita; los temporales de "Abrir" se purgan al salir |
 
@@ -36,9 +37,12 @@ nunca abandona tu equipo.
 
 | Característica | Detalle |
 |---|---|
-| **Barra de herramientas** | Iconos [Lucide](https://lucide.dev): Nuevo · Abrir · Guardar como · Imprimir · Buscar · PDF/EML/PNG · zoom · Unlink · metadatos · código fuente · Acerca de |
-| **Exportar** (8 formatos) | **PDF** (A4/Carta), **EML**, **PNG** (+copiar al portapapeles), **HTML**, **TXT**, **MHT** (web con imágenes embebidas), **JSON** (pipelines) y **ZIP** (correo + metadata + cuerpos + adjuntos) |
-| **Guardar como…** | Un diálogo, formato según la extensión elegida (Ctrl+S) |
+| **Barra de herramientas** | Iconos [Lucide](https://lucide.dev): Nuevo · Abrir · Guardar como · Imprimir · Copiar · Buscar · Exportar · zoom del cuerpo · oscurecer el cuerpo · Unlink · metadatos · código fuente · Acerca de |
+| **Exportar** (9 formatos) | **PDF** (A4/Carta), **EML**, **PNG** (+copiar al portapapeles), **HTML**, **TXT**, **Markdown**, **MHT** (web con imágenes embebidas), **JSON** (pipelines) y **ZIP** (correo + metadata + cuerpos + adjuntos) |
+| **Guardar como…** | Un diálogo con **los mismos formatos que Exportar** (+ el original); el formato se decide por la extensión elegida (Ctrl+S) |
+| **Copiar con formato** | Copia la selección (o todo el cuerpo) conservando texto enriquecido e imágenes |
+| **Adjuntos arrastrables** | Arrastra un adjunto fuera de la app para soltarlo en el gestor de archivos o en un correo nuevo |
+| **Accesibilidad** | Zoom del cuerpo y modo de alto contraste (fondo oscuro, texto claro) independientes de la ventana |
 | **Imprimir** | Diálogo del sistema sobre el mensaje y su cabecera (Ctrl+P) |
 | **Búsqueda** | En el cuerpo (Ctrl+F): resaltado, contador y desplazamiento a la coincidencia |
 | **Adjuntos** | Clic para Abrir con la app predeterminada o Guardar; "Guardar todos" con integridad verificada |

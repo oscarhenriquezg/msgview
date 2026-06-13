@@ -155,6 +155,28 @@ test.describe('exportaciones (FR-11/12/13, criterio 4)', () => {
     await expect(page.locator('.toast')).toBeVisible();
     expect(readFileSync(out, 'utf-8')).toBe('a;b;c\n1;2;3\n');
   });
+
+  test('exportar Markdown produce cabecera y cuerpo en sintaxis MD', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    const out = join(dir, 'mensaje.md');
+    await stubSaveDialog(out);
+    await page.locator('#btn-export').click();
+    await page.locator('#export-opt-md').click();
+    await expect(page.locator('.toast')).toContainText('MD');
+    const md = readFileSync(out, 'utf-8');
+    expect(md).toContain('# Informe trimestral Q2');
+    expect(md).toContain('[Ver detalle](https://intranet.example.com/q2)');
+  });
+
+  test('Guardar como ofrece los formatos de exportación (Markdown)', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    const out = join(dir, 'guardado.md');
+    await stubSaveDialog(out);
+    await page.locator('#btn-save-as').click();
+    await expect(page.locator('.toast')).toBeVisible();
+    // El formato se decide por la extensión elegida → congruente con Exportar.
+    expect(readFileSync(out, 'utf-8')).toContain('# Informe trimestral Q2');
+  });
 });
 
 test('Ver→Recargar conserva el documento (pull get-current-document)', async () => {
@@ -299,6 +321,39 @@ test('menú Ver → código fuente abre la ventana de source', async () => {
   );
   const src = await winPromise;
   await expect(src.locator('#hdr')).toContainText('MIME-Version');
+});
+
+test('resalta enlaces cuyo texto aparenta otro dominio (anti-phishing)', async () => {
+  await launch(join(FIXTURES, 'phishing-link.msg'));
+  await expect(page.locator('#subject')).toHaveText('Verifica tu cuenta');
+  const body = page.frameLocator('#body-frame');
+  // El texto dice paypal.com pero el href va a evil-phish.example → marcado.
+  await expect(body.locator('a#bad')).toHaveClass(/__link-mismatch/);
+  await expect(body.locator('a#bad')).toHaveAttribute('title', /paypal\.com.*evil-phish\.example/);
+  // Enlace honesto (texto y host coinciden) y enlace sin dominio en el texto: sin marca.
+  await expect(body.locator('a#ok')).not.toHaveClass(/__link-mismatch/);
+  await expect(body.locator('a#plain')).not.toHaveClass(/__link-mismatch/);
+});
+
+test('arrastrar un adjunto fuera inicia el drag nativo con el archivo extraído', async () => {
+  await launch(join(FIXTURES, 'html-basic.msg'));
+  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+  // Intercepta startDrag para capturar la ruta temporal del adjunto extraído.
+  await app.evaluate(({ BrowserWindow }) => {
+    const wc = BrowserWindow.getAllWindows()[0]!.webContents;
+    (globalThis as { __dragFile?: string }).__dragFile = '';
+    wc.startDrag = ((item: { file: string }) => {
+      (globalThis as { __dragFile?: string }).__dragFile = item.file;
+    }) as never;
+  });
+  const chip = page.locator('.chip', { hasText: 'datos.csv' });
+  await chip.dispatchEvent('dragstart');
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as { __dragFile?: string }).__dragFile), { timeout: 5000 })
+    .not.toBe('');
+  const file = await app.evaluate(() => (globalThis as { __dragFile?: string }).__dragFile);
+  expect(file).toMatch(/datos\.csv$/);
+  expect(readFileSync(file!, 'utf-8')).toBe('a;b;c\n1;2;3\n');
 });
 
 test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
