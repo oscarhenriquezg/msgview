@@ -356,7 +356,7 @@ async function openEmbedded(id: number): Promise<void> {
  */
 function handleDrop(files?: FileList): void {
   const file = files?.[0];
-  if (!file || !/\.(msg|eml)$/i.test(file.name)) return;
+  if (!file || !/\.(msg|eml|emlx)$/i.test(file.name)) return;
   void api.openDroppedFile(file).then(applyResult);
 }
 
@@ -379,7 +379,7 @@ async function saveAttachments(ids?: number[]): Promise<void> {
 let pngTarget: 'file' | 'clipboard' = 'file';
 
 async function exportDocument(
-  format: 'pdf' | 'eml' | 'png',
+  format: 'pdf' | 'eml' | 'png' | 'html' | 'txt',
   acceptTruncation = false,
   target: 'file' | 'clipboard' = 'file'
 ): Promise<void> {

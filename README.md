@@ -18,8 +18,8 @@ nunca abandona tu equipo.
   conversión RTF aproximada → texto plano.
 - **Imágenes incrustadas** (`cid:`) renderizadas en su posición; las imágenes
   remotas se bloquean y se muestran como placeholder (privacidad por diseño).
-- **También archivos `.eml`** (RFC 5322), con detección por contenido:
-  un `.msg` renombrado a `.eml` se abre igual.
+- **También archivos `.eml`** (RFC 5322) y `.emlx` (Apple Mail), con
+  detección por contenido: un `.msg` renombrado a `.eml` se abre igual.
 - **Mensajes `.msg`/`.eml` anidados**: se abren en ventana propia para
   comparar correos lado a lado.
 - **Direcciones de Exchange**: resuelve la dirección SMTP real en lugar de
@@ -45,9 +45,10 @@ nunca abandona tu equipo.
   zoom (+/100%/−) · Unlink · metadatos · código fuente · Acerca de.
 - **Guardar como…** (Ctrl+S) en un solo diálogo: copia original, **PDF**,
   **EML**, **PNG**, **HTML** o **TXT** según la extensión elegida.
-- **Exportar a PDF** (A4/Carta según región, sin diálogo de impresión),
-  **EML** (MIME estándar abrible en Thunderbird) y **PNG** (página completa,
-  con opción de **copiar la imagen al portapapeles** para pegarla donde sea).
+- **Exportar** (submenú Archivo → Exportar) a **PDF** (A4/Carta según región,
+  sin diálogo de impresión), **EML** (MIME estándar abrible en Thunderbird),
+  **PNG** (página completa, con opción de **copiar la imagen al portapapeles**),
+  **HTML** y **TXT**.
 - **Imprimir** con el diálogo del sistema (Ctrl+P).
 - **Búsqueda en el mensaje** (Ctrl+F) con resaltado, contador y
   desplazamiento hasta la coincidencia activa.

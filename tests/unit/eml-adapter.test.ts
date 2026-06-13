@@ -37,6 +37,16 @@ describe('parseAny — archivos .eml (RFC 5322)', () => {
     expect(Buffer.from(att!.content).toString()).toBe('x;y\n1;2\n');
   });
 
+  it('abre archivos .emlx de Apple Mail (prefijo de longitud + plist)', async () => {
+    const result = await parseAny(load('sample.emlx'), 'sample.emlx');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.metadata.subject).toBe('Correo EML de prueba');
+    expect(result.document.metadata.from.email).toBe('ana.perez@example.com');
+    // El plist final de metadatos no debe colarse en el cuerpo.
+    expect(result.document.bodyHtml).not.toContain('plist');
+  });
+
   it('un .msg renombrado a .eml se detecta por contenido (FR-05)', async () => {
     const result = await parseAny(load('renamed-msg.eml'), 'renamed-msg.eml');
     expect(result.ok).toBe(true);

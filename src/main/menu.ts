@@ -38,9 +38,11 @@ const STRINGS = {
     exportPdf: 'Exportar a PDF…',
     exportEml: 'Exportar a EML…',
     exportPng: 'Exportar a PNG…',
+    exportHtml: 'Exportar a HTML…',
+    exportTxt: 'Exportar a TXT…',
     print: 'Imprimir…',
     saveAs: 'Guardar como…',
-    associate: 'Asociar archivos .msg a esta aplicación…',
+    associate: 'Asociar tipos de archivo…',
     recents: 'Recientes',
     noRecents: '(vacío)',
     clearRecents: 'Limpiar recientes',
@@ -82,9 +84,11 @@ const STRINGS = {
     exportPdf: 'Export to PDF…',
     exportEml: 'Export to EML…',
     exportPng: 'Export to PNG…',
+    exportHtml: 'Export to HTML…',
+    exportTxt: 'Export to TXT…',
     print: 'Print…',
     saveAs: 'Save as…',
-    associate: 'Associate .msg files with this app…',
+    associate: 'Associate file types…',
     recents: 'Recent files',
     noRecents: '(empty)',
     clearRecents: 'Clear recents',
@@ -269,6 +273,18 @@ export function installMenu(opts: MenuOptions): void {
               accelerator: 'CmdOrCtrl+Shift+G',
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'png' })
+            },
+            {
+              id: 'export-html',
+              label: s.exportHtml,
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'html' })
+            },
+            {
+              id: 'export-txt',
+              label: s.exportTxt,
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'txt' })
             }
           ]
         },
@@ -284,7 +300,7 @@ export function installMenu(opts: MenuOptions): void {
         {
           label: s.associate,
           click: (_item, win) =>
-            void associateMsgFiles(win instanceof BrowserWindow ? win : null)
+            associateMsgFiles(win instanceof BrowserWindow ? win : null)
         },
         { type: 'separator' },
         isMac ? { role: 'close' as const } : { role: 'quit' as const, label: s.quit }
@@ -403,7 +419,17 @@ export function installContextMenu(win: BrowserWindow): void {
 /** Habilita exportaciones e impresión solo con un documento cargado. */
 export function setExportEnabled(enabled: boolean): void {
   const menu = Menu.getApplicationMenu();
-  for (const id of ['export-pdf', 'export-eml', 'export-png', 'print', 'copy-meta', 'copy-meta-json', 'save-as']) {
+  for (const id of [
+    'export-pdf',
+    'export-eml',
+    'export-png',
+    'export-html',
+    'export-txt',
+    'print',
+    'copy-meta',
+    'copy-meta-json',
+    'save-as'
+  ]) {
     const item = menu?.getMenuItemById(id);
     if (item) item.enabled = enabled;
   }

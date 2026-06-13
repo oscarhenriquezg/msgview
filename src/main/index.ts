@@ -230,7 +230,7 @@ function loadRenderer(win: BrowserWindow): Promise<void> {
 function msgPathFromArgv(argv: string[], cwd: string): string | null {
   const candidate = argv
     .slice(1)
-    .find((a) => !a.startsWith('-') && /\.(msg|eml)$/i.test(a));
+    .find((a) => !a.startsWith('-') && /\.(msg|eml|emlx)$/i.test(a));
   if (!candidate) return null;
   return candidate.startsWith('/') ? candidate : join(cwd, candidate);
 }
@@ -291,7 +291,7 @@ function registerIpc(): void {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return null;
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      filters: [{ name: 'Mensajes de correo', extensions: ['msg', 'eml'] }],
+      filters: [{ name: 'Mensajes de correo', extensions: ['msg', 'eml', 'emlx'] }],
       properties: ['openFile']
     });
     const first = filePaths[0];
@@ -428,6 +428,12 @@ function registerIpc(): void {
         return exportEml(state.buffer, filePath);
       case 'png':
         return exportPng(doc, filePath, req.acceptTruncation ?? false);
+      case 'html':
+        await writeFile(filePath, buildPrintableHtml(doc, app.getLocale()), 'utf-8');
+        return { ok: true, filePath };
+      case 'txt':
+        await writeFile(filePath, documentToText(doc), 'utf-8');
+        return { ok: true, filePath };
     }
   });
 

@@ -259,4 +259,14 @@ writeFileSync(join(outDir, 'sample.eml'), EML_SAMPLE);
 // .msg renombrado a .eml: la detección debe ser por contenido.
 writeFileSync(join(outDir, 'renamed-msg.eml'), readFileSync(join(outDir, 'html-basic.msg')));
 
+// EMLX (Apple Mail): nº de bytes + RFC822 + plist de metadatos.
+const emlxMsg = Buffer.from(EML_SAMPLE, 'utf-8');
+const emlxPlist =
+  '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>' +
+  '<key>flags</key><integer>8623</integer></dict></plist>\n';
+writeFileSync(
+  join(outDir, 'sample.emlx'),
+  Buffer.concat([Buffer.from(`${emlxMsg.length}\n`), emlxMsg, Buffer.from(emlxPlist)])
+);
+
 console.log('Fixtures generados en', outDir);

@@ -1,0 +1,45 @@
+1376
+Received: from mx.example.net (mx.example.net [203.0.113.9])
+	by destino.example.com with ESMTPS;
+	Mon, 10 Jun 2024 12:00:45 +0000
+Received: from origen.example.org (origen.example.org [198.51.100.7])
+	by mx.example.net with ESMTP;
+	Mon, 10 Jun 2024 12:00:05 +0000
+Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=example.com;
+	dkim=pass header.d=example.com; dmarc=pass
+From: "Ana Pérez" <ana.perez@example.com>
+To: "Oscar Henríquez" <oscar@example.com>
+Cc: dept@example.com
+Subject: =?utf-8?B?Q29ycmVvIEVNTCBkZSBwcnVlYmE=?=
+Date: Mon, 10 Jun 2024 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="MIX"
+
+--MIX
+Content-Type: multipart/alternative; boundary="ALT"
+
+--ALT
+Content-Type: text/plain; charset=utf-8
+
+Versión en texto plano.
+--ALT
+Content-Type: text/html; charset=utf-8
+
+<html><body><h1>EML</h1><p>Con <b>imagen</b>:</p><img src="cid:foto1"><script>window.PWNED=1</script></body></html>
+--ALT--
+--MIX
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <foto1>
+Content-Disposition: inline; filename="foto.png"
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==
+--MIX
+Content-Type: text/csv; name="datos.csv"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="datos.csv"
+
+eDt5CjE7Mgo=
+--MIX--
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict><key>flags</key><integer>8623</integer></dict></plist>
