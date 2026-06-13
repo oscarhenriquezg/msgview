@@ -45,6 +45,10 @@ mac:
       arch: universal
   darkModeSupport: true
   minimumSystemVersion: '12.0'
+  # Prebuilds .bare (bare-fs, vía archiver→tar-stream) son idénticos entre
+  # arquitecturas y solo se usan en el runtime Bare, no en Node. Se toman del
+  # build x64 para que no rompan el merge del binario universal.
+  x64ArchFiles: '**/*.bare'
   # Firma/notarización: definir CSC_LINK / APPLE_ID en el entorno de build macOS.
 
 dmg:
