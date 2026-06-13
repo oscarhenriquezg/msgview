@@ -33,6 +33,8 @@ Para las pruebas manuales: `npm run dev` y abrir los fixtures de
 | Des-encapsular HTML desde RTF comprimido | ✅ Auto · unit *des-encapsula HTML desde RTF comprimido* |
 | RTF puro → conversión aproximada | ✅ Auto · unit *convierte RTF puro de forma aproximada* |
 | Texto plano envuelto en `<pre>` | ✅ Auto · unit *cae a texto plano envuelto en `<pre>`* |
+| Cadenas ANSI (001E) con codepage no latino (sin mojibake) | ✅ Auto · unit *decodifica cadenas ANSI (001E) según PR_MESSAGE_CODEPAGE* |
+| Cuerpo HTML binario decodificado por PR_INTERNET_CPID | ✅ Auto · cubierto vía `decodeHtmlBytes` (unit de adapter) |
 | Mensajes anidados (.msg/.eml) en ventana propia | 🔍 Manual · abrir un correo con un `.msg` adjunto → clic en ↗ del chip → se abre ventana nueva |
 | Abrir con doble clic / "Abrir con" del SO | 🔍 Manual · asociar tipos y abrir un `.msg` desde el gestor de archivos |
 | Arrastrar archivo a la ventana (drag-in) | 🔍 Manual · arrastrar un `.msg` sobre la zona de bienvenida y sobre un correo abierto |

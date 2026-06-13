@@ -25,6 +25,15 @@ describe('MsgAdapter — archivos válidos', () => {
     expect(doc.attachments[0]?.isInline).toBe(false);
   });
 
+  it('decodifica cadenas ANSI (001E) según PR_MESSAGE_CODEPAGE, sin mojibake', () => {
+    const result = parse('ansi-cyrillic.msg');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Sin aplicar el codepage 1251 estos textos cirílicos saldrían como mojibake.
+    expect(result.document.metadata.subject).toBe('Привет, отчёт');
+    expect(result.document.bodyHtml).toContain('кодировке Windows-1251');
+  });
+
   it('destinatarios de Exchange: prefiere SMTP y omite el DN X.500', () => {
     const result = parse('exchange-dn.msg');
     expect(result.ok).toBe(true);

@@ -8,6 +8,7 @@
  * recogen automáticamente.
  */
 import * as CFB from 'cfb';
+import iconv from 'iconv-lite';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +73,28 @@ function buildMsg({ subject, senderName, senderEmail, bodyHtml, bodyText, compre
   return Buffer.from(CFB.write(cfb, { type: 'buffer' }));
 }
 
+/**
+ * .msg ANSI: cadenas en streams 001E (PtypString8) codificadas en un codepage
+ * no latino, con PR_MESSAGE_CODEPAGE (3FFD0003) declarado en el property stream.
+ * Sirve para verificar que el parser evita el mojibake (no asume latin1).
+ */
+function buildAnsiMsg({ subject, bodyText, codepage }) {
+  const cfb = CFB.utils.cfb_new();
+  const add = (path, content) => CFB.utils.cfb_add(cfb, path, content);
+  // Property stream raíz: cabecera de 32 bytes + 1 entrada de 16 bytes con
+  // PR_MESSAGE_CODEPAGE (tag 0x3FFD0003, tipo integer).
+  const header = Buffer.alloc(32);
+  const entry = Buffer.alloc(16);
+  entry.writeUInt32LE(0x3ffd0003, 0); // propertyTag
+  entry.writeUInt32LE(0x06, 4); // flags
+  entry.writeUInt32LE(codepage, 8); // valor int32 = codepage
+  add('/__properties_version1.0', Buffer.concat([header, entry]));
+  add('/__substg1.0_001A001F', utf16('IPM.Note'));
+  add(`/__substg1.0_0037001E`, iconv.encode(subject, `cp${codepage}`)); // subject ANSI
+  add(`/__substg1.0_1000001E`, iconv.encode(bodyText, `cp${codepage}`)); // body ANSI
+  return Buffer.from(CFB.write(cfb, { type: 'buffer' }));
+}
+
 /** Envuelve RTF en el formato PidTagRtfCompressed sin compresión (COMPTYPE "MELA"). */
 function lzfuUncompressed(rtf) {
   const body = Buffer.from(rtf, 'latin1');
@@ -111,6 +134,12 @@ writeFileSync(join(outDir, 'html-basic.msg'), buildMsg({
     { fileName: 'informe.pdf', extension: '.pdf', content: Buffer.from('%PDF-1.4 fake fixture') },
     { fileName: 'datos.csv', extension: '.csv', content: Buffer.from('a;b;c\n1;2;3\n') }
   ]
+}));
+
+writeFileSync(join(outDir, 'ansi-cyrillic.msg'), buildAnsiMsg({
+  subject: 'Привет, отчёт',
+  bodyText: 'Текст письма в кодировке Windows-1251.',
+  codepage: 1251
 }));
 
 writeFileSync(join(outDir, 'phishing-link.msg'), buildMsg({

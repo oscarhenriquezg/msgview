@@ -1,4 +1,4 @@
-import MsgReaderModule, { type FieldsData } from '@kenjiuno/msgreader';
+import MsgReaderModule, { type FieldsData, type ParserConfig } from '@kenjiuno/msgreader';
 
 // Interop CJS↔ESM: en Node ESM el default import de un paquete CJS es
 // module.exports; la clase vive en .default.
@@ -51,6 +51,32 @@ function asDataView(buffer: Buffer): DataView {
   );
 }
 
+/**
+ * Abre un .msg decodificando bien las cadenas ANSI (PtypString8, sufijo 001E).
+ * msgreader, sin `ansiEncoding`, lee esas cadenas como latin1 → mojibake en
+ * codepages no latinos (cirílico, griego, turco, CJK…). Hacemos dos pasadas:
+ * la 1.ª descubre el codepage declarado (PR_MESSAGE_CODEPAGE / PR_INTERNET_CPID)
+ * y, si es no latino y soportado, se reabre forzando esa codificación. Los
+ * .msg Unicode (001F, la mayoría) leen igual y no pagan la segunda pasada.
+ */
+function readMsg(
+  buffer: Buffer,
+  extraConfig: ParserConfig = {}
+): { reader: MsgReader; fields: FieldsData } {
+  const reader = new MsgReader(asDataView(buffer));
+  reader.parserConfig = { ...extraConfig };
+  const fields = reader.getFileData();
+
+  const cp = fields.messageCodepage ?? fields.internetCodepage;
+  // 1252/65001 ya se leen aceptablemente por defecto; reabrir solo aporta coste.
+  if (cp && cp !== 1252 && cp !== 65001 && iconv.encodingExists(`cp${cp}`)) {
+    const reader2 = new MsgReader(asDataView(buffer));
+    reader2.parserConfig = { ...extraConfig, ansiEncoding: `cp${cp}` };
+    return { reader: reader2, fields: reader2.getFileData() };
+  }
+  return { reader, fields };
+}
+
 /** Tamaño mínimo de un CFBF válido: cabecera de 512 bytes + un sector. */
 const CFBF_MIN_SIZE = 1024;
 
@@ -101,8 +127,7 @@ export class MsgAdapter {
     let reader: MsgReader;
     let fields: FieldsData;
     try {
-      reader = new MsgReader(asDataView(buffer));
-      fields = reader.getFileData();
+      ({ reader, fields } = readMsg(buffer));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/sector|offset|bounds|length|size/i.test(msg)) return error('truncated', msg);
@@ -134,8 +159,7 @@ export class MsgAdapter {
     attachmentId: number
   ): { fileName: string; content: Uint8Array } | null {
     try {
-      const reader = new MsgReader(asDataView(buffer));
-      const fields = reader.getFileData();
+      const { reader, fields } = readMsg(buffer);
       const attachment = fields.attachments?.[attachmentId];
       if (!attachment) return null;
       const data = reader.getAttachment(attachment);
@@ -153,8 +177,7 @@ export class MsgAdapter {
     const result = MsgAdapter.parse(buffer, '');
     if (!result.ok) return null;
     try {
-      const reader = new MsgReader(asDataView(buffer));
-      const fields = reader.getFileData();
+      const { reader, fields } = readMsg(buffer);
       const adapter = new MsgAdapter(reader, fields);
       const { html, source } = adapter.resolveBody();
       // El <pre> sintético de la vía texto plano no es HTML real del mensaje.
@@ -189,9 +212,7 @@ export class MsgAdapter {
   /** Propiedades MAPI crudas para la vista de código fuente (OBJ-S3). */
   static getRawProperties(buffer: Buffer): { tag: string; name?: string; value: string }[] | null {
     try {
-      const reader = new MsgReader(asDataView(buffer));
-      reader.parserConfig = { includeRawProps: true };
-      const fields = reader.getFileData();
+      const { fields } = readMsg(buffer, { includeRawProps: true });
       return (fields.rawProps ?? []).map((p) => {
         let value: string;
         if (p.value instanceof Uint8Array) {
