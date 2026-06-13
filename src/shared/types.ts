@@ -67,7 +67,7 @@ export type LoadResult =
   | { ok: true; document: MsgDocument }
   | { ok: false; error: LoadError };
 
-export type ExportFormat = 'pdf' | 'eml' | 'png' | 'html' | 'txt';
+export type ExportFormat = 'pdf' | 'eml' | 'png' | 'html' | 'txt' | 'mht' | 'json' | 'zip';
 
 export interface ExportRequest {
   format: ExportFormat;

@@ -21,6 +21,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
+    "@types/archiver": "^8.0.0",
     "@types/jsdom": "^28.0.3",
     "@types/mailparser": "^3.4.6",
     "@types/node": "^25.9.3",
@@ -40,6 +41,7 @@
   "dependencies": {
     "@kenjiuno/decompressrtf": "^0.1.4",
     "@kenjiuno/msgreader": "^1.28.0",
+    "archiver": "^8.0.0",
     "dompurify": "^3.4.10",
     "iconv-lite": "^0.7.2",
     "jsdom": "^29.1.1",

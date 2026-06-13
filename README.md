@@ -48,7 +48,9 @@ nunca abandona tu equipo.
 - **Exportar** (submenú Archivo → Exportar) a **PDF** (A4/Carta según región,
   sin diálogo de impresión), **EML** (MIME estándar abrible en Thunderbird),
   **PNG** (página completa, con opción de **copiar la imagen al portapapeles**),
-  **HTML** y **TXT**.
+  **HTML**, **TXT**, **MHT** (web autocontenida con imágenes embebidas),
+  **JSON** (metadatos + cuerpo, para pipelines) y **ZIP** (correo original +
+  metadata + cuerpos + carpeta `attachments/` con todos los adjuntos).
 - **Imprimir** con el diálogo del sistema (Ctrl+P).
 - **Búsqueda en el mensaje** (Ctrl+F) con resaltado, contador y
   desplazamiento hasta la coincidencia activa.

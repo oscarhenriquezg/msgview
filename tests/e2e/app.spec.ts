@@ -103,6 +103,23 @@ test.describe('exportaciones (FR-11/12/13, criterio 4)', () => {
     expect(readFileSync(out).subarray(0, 5).toString()).toBe('%PDF-');
   });
 
+  test('exportar ZIP empaqueta el correo con sus adjuntos', async () => {
+    await launch(join(FIXTURES, 'html-basic.msg'));
+    await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
+    const out = join(dir, 'caso.zip');
+    await stubSaveDialog(out);
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.webContents.send('menu-action', {
+        type: 'export',
+        format: 'zip'
+      })
+    );
+    await expect(page.locator('.toast')).toContainText('ZIP', { timeout: 15000 });
+    const raw = readFileSync(out);
+    expect(raw.subarray(0, 2).toString()).toBe('PK');
+    expect(raw.toString('latin1')).toContain('attachments/informe.pdf');
+  });
+
   test('exportar EML produce MIME con cabeceras estándar', async () => {
     await launch(join(FIXTURES, 'html-basic.msg'));
     const out = join(dir, 'mensaje.eml');

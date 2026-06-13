@@ -40,6 +40,9 @@ const STRINGS = {
     exportPng: 'Exportar a PNG…',
     exportHtml: 'Exportar a HTML…',
     exportTxt: 'Exportar a TXT…',
+    exportMht: 'Exportar a MHT (web)…',
+    exportJson: 'Exportar a JSON…',
+    exportZip: 'Exportar a ZIP (con adjuntos)…',
     print: 'Imprimir…',
     saveAs: 'Guardar como…',
     associate: 'Asociar tipos de archivo…',
@@ -86,6 +89,9 @@ const STRINGS = {
     exportPng: 'Export to PNG…',
     exportHtml: 'Export to HTML…',
     exportTxt: 'Export to TXT…',
+    exportMht: 'Export to MHT (web)…',
+    exportJson: 'Export to JSON…',
+    exportZip: 'Export to ZIP (with attachments)…',
     print: 'Print…',
     saveAs: 'Save as…',
     associate: 'Associate file types…',
@@ -285,6 +291,25 @@ export function installMenu(opts: MenuOptions): void {
               label: s.exportTxt,
               enabled: false,
               click: () => sendToFocused({ type: 'export', format: 'txt' })
+            },
+            { type: 'separator' },
+            {
+              id: 'export-mht',
+              label: s.exportMht,
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'mht' })
+            },
+            {
+              id: 'export-json',
+              label: s.exportJson,
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'json' })
+            },
+            {
+              id: 'export-zip',
+              label: s.exportZip,
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'zip' })
             }
           ]
         },
@@ -425,6 +450,9 @@ export function setExportEnabled(enabled: boolean): void {
     'export-png',
     'export-html',
     'export-txt',
+    'export-mht',
+    'export-json',
+    'export-zip',
     'print',
     'copy-meta',
     'copy-meta-json',

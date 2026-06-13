@@ -379,7 +379,7 @@ async function saveAttachments(ids?: number[]): Promise<void> {
 let pngTarget: 'file' | 'clipboard' = 'file';
 
 async function exportDocument(
-  format: 'pdf' | 'eml' | 'png' | 'html' | 'txt',
+  format: 'pdf' | 'eml' | 'png' | 'html' | 'txt' | 'mht' | 'json' | 'zip',
   acceptTruncation = false,
   target: 'file' | 'clipboard' = 'file'
 ): Promise<void> {

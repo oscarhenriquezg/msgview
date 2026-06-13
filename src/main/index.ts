@@ -22,6 +22,7 @@ import {
 } from './export/exporter';
 import { buildPrintableHtml } from './export/printable';
 import { documentToText } from './export/textout';
+import { documentToJson, exportMht, exportZip } from './export/bundle';
 import { APP_ICON_PATH, installContextMenu, installMenu, setExportEnabled, showAbout } from './menu';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
@@ -434,6 +435,19 @@ function registerIpc(): void {
       case 'txt':
         await writeFile(filePath, documentToText(doc), 'utf-8');
         return { ok: true, filePath };
+      case 'mht':
+        return exportMht(doc, state.buffer, filePath, buildPrintableHtml(doc, app.getLocale()));
+      case 'json':
+        await writeFile(filePath, documentToJson(doc), 'utf-8');
+        return { ok: true, filePath };
+      case 'zip':
+        return exportZip(
+          doc,
+          state.buffer,
+          filePath,
+          isCfbf(state.buffer),
+          buildPrintableHtml(doc, app.getLocale())
+        );
     }
   });
 
