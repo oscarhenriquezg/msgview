@@ -473,7 +473,7 @@ function registerIpc(): void {
         { name: 'EML', extensions: ['eml'] },
         { name: 'PNG', extensions: ['png'] },
         { name: 'HTML', extensions: ['html'] },
-        { name: 'Texto', extensions: ['txt'] }
+        { name: 'TXT', extensions: ['txt'] }
       ]
     });
     if (canceled || !filePath) return { ok: false, reason: 'cancelled' };

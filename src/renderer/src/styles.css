@@ -330,27 +330,36 @@ dialog p { font-size: 13.5px; }
   white-space: nowrap;
 }
 
-/* ---------- Toasts (UI-06) ---------- */
+/* ---------- Toasts (UI-06): centrados, fondo translúcido, autodesvanecido ---------- */
 .toasts {
   position: fixed;
-  bottom: 18px;
-  right: 18px;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  z-index: 10;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 30;
+  pointer-events: none; /* no bloquear la UI bajo el toast */
 }
 .toast {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-  padding: 10px 14px;
-  font-size: 13px;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  padding: 14px 22px;
+  font-size: 14px;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 12px;
-  animation: toast-in 0.18s ease-out;
+  gap: 14px;
+  max-width: 80%;
+  text-align: center;
+  animation: toast-in 0.2s ease-out, toast-out 0.5s ease-in 4.5s forwards;
 }
 .toast button {
   border: none;
@@ -358,10 +367,14 @@ dialog p { font-size: 13.5px; }
   color: var(--accent);
   cursor: pointer;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 600;
 }
-.toast.error { border-color: var(--danger); }
+.toast.error { border-color: var(--danger); color: var(--danger); }
 @keyframes toast-in {
-  from { transform: translateY(8px); opacity: 0; }
+  from { transform: scale(0.92); opacity: 0; }
   to { transform: none; opacity: 1; }
+}
+@keyframes toast-out {
+  to { opacity: 0; transform: scale(0.97); }
 }

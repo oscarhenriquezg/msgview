@@ -34,6 +34,7 @@ const STRINGS = {
   es: {
     file: 'Archivo',
     open: 'Abrir…',
+    export: 'Exportar',
     exportPdf: 'Exportar a PDF…',
     exportEml: 'Exportar a EML…',
     exportPng: 'Exportar a PNG…',
@@ -77,6 +78,7 @@ const STRINGS = {
   en: {
     file: 'File',
     open: 'Open…',
+    export: 'Export',
     exportPdf: 'Export to PDF…',
     exportEml: 'Export to EML…',
     exportPng: 'Export to PNG…',
@@ -243,27 +245,32 @@ export function installMenu(opts: MenuOptions): void {
           enabled: false,
           click: () => sendToFocused({ type: 'save-as' })
         },
-        { type: 'separator' },
         {
-          id: 'export-pdf',
-          label: s.exportPdf,
-          accelerator: 'CmdOrCtrl+Shift+P',
-          enabled: false,
-          click: () => sendToFocused({ type: 'export', format: 'pdf' })
-        },
-        {
-          id: 'export-eml',
-          label: s.exportEml,
-          accelerator: 'CmdOrCtrl+Shift+E',
-          enabled: false,
-          click: () => sendToFocused({ type: 'export', format: 'eml' })
-        },
-        {
-          id: 'export-png',
-          label: s.exportPng,
-          accelerator: 'CmdOrCtrl+Shift+G',
-          enabled: false,
-          click: () => sendToFocused({ type: 'export', format: 'png' })
+          id: 'export',
+          label: s.export,
+          submenu: [
+            {
+              id: 'export-pdf',
+              label: s.exportPdf,
+              accelerator: 'CmdOrCtrl+Shift+P',
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'pdf' })
+            },
+            {
+              id: 'export-eml',
+              label: s.exportEml,
+              accelerator: 'CmdOrCtrl+Shift+E',
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'eml' })
+            },
+            {
+              id: 'export-png',
+              label: s.exportPng,
+              accelerator: 'CmdOrCtrl+Shift+G',
+              enabled: false,
+              click: () => sendToFocused({ type: 'export', format: 'png' })
+            }
+          ]
         },
         { type: 'separator' },
         {

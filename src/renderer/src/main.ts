@@ -600,7 +600,8 @@ function toast(message: string, pathForFolder?: string, isError = false): void {
     node.append(btn);
   }
   el.toasts.append(node);
-  setTimeout(() => node.remove(), 6000);
+  // El CSS desvanece el toast a los 5 s (4,5 s visible + 0,5 s de fundido).
+  setTimeout(() => node.remove(), 5000);
 }
 
 // ---------------------------------------------------------------------------
