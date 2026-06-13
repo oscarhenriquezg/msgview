@@ -1,5 +1,6 @@
 import { simpleParser, type AddressObject, type ParsedMail } from 'mailparser';
 import type { LoadResult, MsgDocument, MsgRecipient } from '@shared/types';
+import { isUsableSmtp } from './address';
 import { MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INLINE_IMAGE_BYTES, MAX_TOTAL_INLINE_BYTES } from './limits';
 import { plainTextToHtml } from './rtf';
 import { sanitizeEmailHtml } from './sanitize';
@@ -15,11 +16,12 @@ function flattenAddresses(
 ): MsgRecipient[] {
   const objects = Array.isArray(value) ? value : value ? [value] : [];
   return objects.flatMap((o) =>
-    o.value.map((a) => ({
-      name: a.name ?? '',
-      email: a.address ?? '',
-      type
-    }))
+    o.value.map((a) => {
+      // Algunos .eml exportados desde Exchange llevan el DN X.500 en lugar
+      // del SMTP en From/To/Cc; nunca debe propagarse a la vista ni a exports.
+      const email = isUsableSmtp(a.address) ? a.address!.trim() : '';
+      return { name: a.name ?? '', email, type };
+    })
   );
 }
 
@@ -84,7 +86,9 @@ export async function parseEml(buffer: Buffer, sourcePath: string): Promise<Load
       subject: mail.subject ?? '',
       from: {
         name: mail.from?.value[0]?.name ?? '',
-        email: mail.from?.value[0]?.address ?? ''
+        email: isUsableSmtp(mail.from?.value[0]?.address)
+          ? mail.from!.value[0]!.address!.trim()
+          : ''
       },
       recipients: [
         ...flattenAddresses(mail.to, 'to'),

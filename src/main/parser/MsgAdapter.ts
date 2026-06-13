@@ -21,6 +21,7 @@ import {
   MAX_INLINE_IMAGE_BYTES,
   MAX_TOTAL_INLINE_BYTES
 } from './limits';
+import { bestSmtpAddress } from './address';
 import { plainTextToHtml, rtfCompressedToHtml } from './rtf';
 import { sanitizeEmailHtml } from './sanitize';
 
@@ -315,18 +316,6 @@ export class MsgAdapter {
     }
     return out;
   }
-}
-
-/**
- * En mensajes internos de Exchange, PidTagEmailAddress contiene el DN X.500
- * (/o=ExchangeLabs/...), no una dirección utilizable. Se elige la primera
- * candidata con forma SMTP; si solo existe el DN, se omite el email.
- */
-function bestSmtpAddress(...candidates: (string | undefined)[]): string {
-  for (const c of candidates) {
-    if (c && c.includes('@') && !c.startsWith('/')) return c;
-  }
-  return '';
 }
 
 function toIso(value?: string): string | undefined {

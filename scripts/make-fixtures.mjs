@@ -259,6 +259,20 @@ writeFileSync(join(outDir, 'sample.eml'), EML_SAMPLE);
 // .msg renombrado a .eml: la detección debe ser por contenido.
 writeFileSync(join(outDir, 'renamed-msg.eml'), readFileSync(join(outDir, 'html-basic.msg')));
 
+// .eml exportado desde Exchange con el DN X.500 en To (debe limpiarse a SMTP/vacío).
+const EML_DN = [
+  'From: "Remitente Interna" </o=ExchangeLabs/ou=Exchange Administrative Group (FYDIBOHF23SPDLT)/cn=Recipients/cn=aa11-Remitente>',
+  'To: "Rodrigo Pinto Rojas" </o=ExchangeLabs/ou=Exchange Administrative Group (FYDIBOHF23SPDLT)/cn=Recipients/cn=51b04ace-Rodrigo Pin>',
+  'Cc: "Real Persona" <real.persona@example.cl>',
+  'Subject: Interno con DN',
+  'Date: Mon, 10 Jun 2024 12:00:00 +0000',
+  'MIME-Version: 1.0',
+  'Content-Type: text/plain; charset=utf-8',
+  '',
+  'cuerpo'
+].join('\r\n');
+writeFileSync(join(outDir, 'eml-exchange-dn.eml'), EML_DN);
+
 // EMLX (Apple Mail): nº de bytes + RFC822 + plist de metadatos.
 const emlxMsg = Buffer.from(EML_SAMPLE, 'utf-8');
 const emlxPlist =

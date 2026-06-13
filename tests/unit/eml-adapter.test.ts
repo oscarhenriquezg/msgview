@@ -54,6 +54,24 @@ describe('parseAny — archivos .eml (RFC 5322)', () => {
     expect(result.document.metadata.subject).toBe('Informe trimestral Q2');
   });
 
+  it('limpia el DN X.500 de Exchange en From/To de un .eml (no se exporta el DN)', async () => {
+    const result = await parseAny(load('eml-exchange-dn.eml'), 'eml-exchange-dn.eml');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const m = result.document.metadata;
+    // El remitente y el destinatario solo-DN quedan sin email (conservan nombre).
+    expect(m.from.email).toBe('');
+    expect(m.from.name).toBe('Remitente Interna');
+    const to = m.recipients.find((r) => r.type === 'to');
+    expect(to?.email).toBe('');
+    expect(to?.name).toBe('Rodrigo Pinto Rojas');
+    // El destinatario con SMTP real sí se conserva.
+    expect(m.recipients.find((r) => r.type === 'cc')?.email).toBe('real.persona@example.cl');
+    // Garantía dura: ni rastro del DN en todo el documento serializado.
+    expect(JSON.stringify(m)).not.toContain('ExchangeLabs');
+    expect(JSON.stringify(m)).not.toContain('/o=');
+  });
+
   it('basura con pinta de ninguno de los dos → error descriptivo', async () => {
     const result = await parseAny(Buffer.from('\x00\x01\x02nada'), 'x.eml');
     expect(result.ok).toBe(false);
