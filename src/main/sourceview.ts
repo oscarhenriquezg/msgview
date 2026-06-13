@@ -11,6 +11,10 @@ export interface SourceViewData {
   headers: string;
   body: string;
   truncated: boolean;
+  hops: import('./headers-analysis').Hop[];
+  auth: import('./headers-analysis').AuthResult[];
+  mapiProps: { tag: string; name?: string; value: string }[] | null;
+  sanitizeRemoved: string[] | null;
 }
 
 const STR = {
@@ -28,7 +32,18 @@ const STR = {
     print: 'Imprimir',
     saved: 'Guardado ✓',
     copied: 'Copiado ✓',
-    error: 'Error'
+    error: 'Error',
+    route: 'Ruta del mensaje (Received)',
+    hopFrom: 'Desde', hopBy: 'Por', hopDate: 'Fecha', hopDelta: 'Δ',
+    auth: 'Autenticación',
+    mapi: 'Propiedades MAPI crudas',
+    mapiTag: 'PidTag', mapiName: 'Nombre', mapiValue: 'Valor',
+    sanit: 'Eliminado por el sanitizador',
+    sanitNone: 'Nada eliminado: el cuerpo no contenía contenido activo ✓',
+    decode: 'Decodificar selección',
+    decodeTitle: 'Selección decodificada',
+    decodeNone: 'La selección no parece base64 ni quoted-printable',
+    close: 'Cerrar'
   },
   en: {
     title: 'Source',
@@ -44,7 +59,18 @@ const STR = {
     print: 'Print',
     saved: 'Saved ✓',
     copied: 'Copied ✓',
-    error: 'Error'
+    error: 'Error',
+    route: 'Message route (Received)',
+    hopFrom: 'From', hopBy: 'By', hopDate: 'Date', hopDelta: 'Δ',
+    auth: 'Authentication',
+    mapi: 'Raw MAPI properties',
+    mapiTag: 'PidTag', mapiName: 'Name', mapiValue: 'Value',
+    sanit: 'Removed by sanitizer',
+    sanitNone: 'Nothing removed: the body had no active content ✓',
+    decode: 'Decode selection',
+    decodeTitle: 'Decoded selection',
+    decodeNone: 'Selection does not look like base64 or quoted-printable',
+    close: 'Close'
   }
 };
 
@@ -56,6 +82,52 @@ const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 export function buildSourceViewHtml(data: SourceViewData): string {
   const s = sourceStrings();
+
+  const fmtDelta = (d?: number) =>
+    d === undefined ? '—' : d >= 0 ? (d < 120 ? `+${d} s` : `+${Math.round(d / 60)} min`) : `${d} s`;
+  const routeSection =
+    data.hops.length === 0
+      ? ''
+      : `<details open><summary>${s.route} · ${data.hops.length}</summary>
+<table><thead><tr><th>#</th><th>${s.hopFrom}</th><th>${s.hopBy}</th><th>${s.hopDate}</th><th>${s.hopDelta}</th></tr></thead><tbody>
+${data.hops
+  .map(
+    (h, i) =>
+      `<tr><td>${i + 1}</td><td>${esc(h.from)}</td><td>${esc(h.by)}</td><td>${
+        h.date ? esc(h.date.replace('T', ' ').replace(/\.\d+Z/, 'Z')) : '—'
+      }</td><td class="${(h.deltaSeconds ?? 0) > 60 ? 'slow' : ''}">${fmtDelta(h.deltaSeconds)}</td></tr>`
+  )
+  .join('')}
+</tbody></table>${
+          data.auth.length > 0
+            ? `<div class="authrow">${s.auth}: ${data.auth
+                .map((a) => {
+                  const cls = a.result === 'pass' ? 'ok' : /fail|reject/.test(a.result) ? 'bad' : 'mid';
+                  return `<span class="chip ${cls}">${a.mechanism.toUpperCase()}=${esc(a.result)}</span>`;
+                })
+                .join(' ')}</div>`
+            : ''
+        }</details>`;
+
+  const mapiSection = !data.mapiProps
+    ? ''
+    : `<details><summary>${s.mapi} · ${data.mapiProps.length}</summary>
+<table><thead><tr><th>${s.mapiTag}</th><th>${s.mapiName}</th><th>${s.mapiValue}</th></tr></thead><tbody>
+${data.mapiProps
+  .map((p) => `<tr><td class="hk">${esc(p.tag)}</td><td>${esc(p.name ?? '')}</td><td>${esc(p.value)}</td></tr>`)
+  .join('')}
+</tbody></table></details>`;
+
+  const sanitSection =
+    data.sanitizeRemoved === null
+      ? ''
+      : `<details${data.sanitizeRemoved.length > 0 ? ' open' : ''}><summary>${s.sanit} · ${data.sanitizeRemoved.length}</summary>
+${
+  data.sanitizeRemoved.length === 0
+    ? `<pre class="okline">${s.sanitNone}</pre>`
+    : `<pre class="badlines">${data.sanitizeRemoved.map((r) => `⚠ ${esc(r)}`).join('\n')}</pre>`
+}</details>`;
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
@@ -92,6 +164,25 @@ export function buildSourceViewHtml(data: SourceViewData): string {
   .b64 { color: var(--b64); }
   mark { background: var(--mark); color: inherit; padding: 0; }
   mark.act { background: var(--mark-active); }
+  details { border-bottom: 1px solid GrayText; }
+  summary { font-family: system-ui, sans-serif; font-size: 12.5px; padding: 9px 14px;
+            cursor: pointer; opacity: .9; user-select: none; }
+  table { border-collapse: collapse; width: 100%; font-size: 11.5px; margin: 0 0 10px; }
+  th, td { text-align: left; padding: 4px 14px; border-top: 1px solid color-mix(in srgb, GrayText 35%, transparent); vertical-align: top; word-break: break-all; }
+  th { font-family: system-ui, sans-serif; opacity: .7; }
+  td.slow { color: #d4a72c; font-weight: 700; }
+  .authrow { font-family: system-ui, sans-serif; padding: 4px 14px 12px; }
+  .chip { display: inline-block; border-radius: 9px; padding: 1px 9px; font-size: 11px; margin-right: 4px; }
+  .chip.ok { background: #2da44e33; color: #2da44e; }
+  .chip.bad { background: #cf222e33; color: #cf222e; }
+  .chip.mid { background: #d4a72c33; color: #b08800; }
+  .okline { color: #2da44e; }
+  .badlines { color: #cf222e; }
+  #dec { position: fixed; bottom: 0; left: 0; right: 0; max-height: 45%; overflow: auto;
+         background: Canvas; border-top: 2px solid Highlight; z-index: 6; }
+  #dec .dbar { display: flex; gap: 8px; align-items: center; font-family: system-ui, sans-serif;
+         padding: 6px 14px; border-bottom: 1px solid GrayText; }
+  #dec pre { padding: 10px 14px; }
 </style></head><body>
 <div class="bar">
   <input id="q" type="text" placeholder="${s.search}" spellcheck="false">
@@ -105,14 +196,26 @@ export function buildSourceViewHtml(data: SourceViewData): string {
   <button id="cpb">${s.copyBody}</button>
   <button id="cpa">${s.copyAll}</button>
   <span class="sep"></span>
+  <button id="dcd">${s.decode}</button>
+  <span class="sep"></span>
   <button id="prn">${s.print}</button>
   <button id="xpdf">PDF</button>
   <button id="xhtml">HTML</button>
   <button id="xtxt">TXT</button>
   <span id="status"></span>
 </div>
-<h2>${s.headers}</h2><pre id="hdr">${data.headers ? esc(data.headers) : s.none}</pre>
-<h2>${s.body}</h2><pre id="src-body">${esc(data.body)}${data.truncated ? esc(s.truncated) : ''}</pre>
+${routeSection}
+<details open><summary>${s.headers}</summary><pre id="hdr">${data.headers ? esc(data.headers) : s.none}</pre></details>
+${mapiSection}
+${sanitSection}
+<details open><summary>${s.body}</summary><pre id="src-body">${esc(data.body)}${data.truncated ? esc(s.truncated) : ''}</pre></details>
+<div id="dec" hidden>
+  <div class="dbar"><b>${s.decodeTitle}</b>
+    <button id="dec-copy">${s.copyAll}</button>
+    <button id="dec-close">${s.close}</button>
+  </div>
+  <pre id="dec-out"></pre>
+</div>
 <script>
 (function () {
   'use strict';
@@ -166,7 +269,8 @@ export function buildSourceViewHtml(data: SourceViewData): string {
     clearMarks();
     if (!text) return;
     var needle = text.toLowerCase();
-    [hdr, body].forEach(function (root) {
+    var roots = Array.prototype.slice.call(document.querySelectorAll('pre, tbody'));
+    roots.forEach(function (root) {
       var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       var nodes = [];
       for (var n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
@@ -196,6 +300,8 @@ export function buildSourceViewHtml(data: SourceViewData): string {
     if (active >= 0) marks[active].classList.remove('act');
     active = ((i % marks.length) + marks.length) % marks.length;
     marks[active].classList.add('act');
+    var det = marks[active].closest('details');
+    if (det) det.open = true;
     marks[active].scrollIntoView({ block: 'center' });
     count.textContent = (active + 1) + '/' + marks.length;
   }
@@ -228,6 +334,48 @@ export function buildSourceViewHtml(data: SourceViewData): string {
     setTimeout(function () { status.textContent = ''; }, 2500);
   }
   function wire(id, fn) { document.getElementById(id).addEventListener('click', fn); }
+  // ---- Decodificador de selección (base64 / quoted-printable) ----
+  function bytesToUtf8(bytes) {
+    try { return new TextDecoder('utf-8', { fatal: false }).decode(bytes); }
+    catch (e) { return null; }
+  }
+  function tryB64(t) {
+    var compact = t.replace(/\\s+/g, '');
+    if (!/^[A-Za-z0-9+\\/]+=*$/.test(compact) || compact.length < 8 || compact.length % 4 !== 0) return null;
+    try {
+      var bin = atob(compact);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytesToUtf8(bytes);
+    } catch (e) { return null; }
+  }
+  function tryQP(t) {
+    if (!/=([0-9A-F]{2}|\\r?\\n)/i.test(t)) return null;
+    var src = t.replace(/=\\r?\\n/g, '');
+    var bytes = [];
+    for (var i = 0; i < src.length; i++) {
+      if (src[i] === '=' && /^[0-9A-F]{2}$/i.test(src.slice(i + 1, i + 3))) {
+        bytes.push(parseInt(src.slice(i + 1, i + 3), 16));
+        i += 2;
+      } else {
+        bytes.push(src.charCodeAt(i));
+      }
+    }
+    return bytesToUtf8(new Uint8Array(bytes));
+  }
+  var dec = document.getElementById('dec');
+  var decOut = document.getElementById('dec-out');
+  document.getElementById('dcd').addEventListener('click', function () {
+    var sel = String(window.getSelection());
+    var out = tryB64(sel) || tryQP(sel);
+    decOut.textContent = out !== null && out.length > 0 ? out : '${s.decodeNone}';
+    dec.hidden = false;
+  });
+  document.getElementById('dec-close').addEventListener('click', function () { dec.hidden = true; });
+  document.getElementById('dec-copy').addEventListener('click', function () {
+    if (window.sourceApi) { window.sourceApi.copyText(decOut.textContent); flash('${s.copied}'); }
+  });
+
   if (window.sourceApi) {
     wire('cph', function () { window.sourceApi.copy('headers'); flash('${s.copied}'); });
     wire('cpb', function () { window.sourceApi.copy('body'); flash('${s.copied}'); });

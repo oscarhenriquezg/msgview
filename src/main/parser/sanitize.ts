@@ -43,6 +43,28 @@ purifier.addHook('afterSanitizeAttributes', (node) => {
   }
 });
 
+/**
+ * Sanitiza e informa qué se eliminó (vista de código fuente: evidencia de
+ * lo que el correo intentaba ejecutar). DOMPurify expone `removed`.
+ */
+export function sanitizeWithReport(html: string): { clean: string; removed: string[] } {
+  const clean = sanitizeEmailHtml(html);
+  const removed = purifier.removed.map((entry) => {
+    const e = entry as { element?: Element; attribute?: Attr | null; from?: Element };
+    if (e.element) {
+      const snippet = (e.element.outerHTML ?? String(e.element)).slice(0, 160);
+      return `<${e.element.tagName?.toLowerCase() ?? '?'}> — ${snippet}`;
+    }
+    if (e.attribute) {
+      const from = e.from?.tagName?.toLowerCase() ?? '?';
+      const value = String(e.attribute.value ?? '').slice(0, 120);
+      return `${e.attribute.name} en <${from}>${value ? ` — "${value}"` : ''}`;
+    }
+    return JSON.stringify(entry).slice(0, 160);
+  });
+  return { clean, removed };
+}
+
 export function sanitizeEmailHtml(html: string): string {
   return purifier.sanitize(html, {
     WHOLE_DOCUMENT: true,

@@ -185,6 +185,30 @@ export class MsgAdapter {
     }
   }
 
+  /** Propiedades MAPI crudas para la vista de código fuente (OBJ-S3). */
+  static getRawProperties(buffer: Buffer): { tag: string; name?: string; value: string }[] | null {
+    try {
+      const reader = new MsgReader(asDataView(buffer));
+      reader.parserConfig = { includeRawProps: true };
+      const fields = reader.getFileData();
+      return (fields.rawProps ?? []).map((p) => {
+        let value: string;
+        if (p.value instanceof Uint8Array) {
+          value = `(binario, ${p.value.length} bytes) ${Buffer.from(p.value.subarray(0, 24)).toString('hex')}…`;
+        } else {
+          value = String(p.value ?? '');
+        }
+        return {
+          tag: p.propertyTag ?? p.propertyLid ?? '????????',
+          name: p.propertyName,
+          value: value.length > 400 ? `${value.slice(0, 400)}…` : value
+        };
+      });
+    } catch {
+      return null;
+    }
+  }
+
   private toDocument(sourcePath: string): MsgDocument {
     const { html, source } = this.resolveBody();
     const attachments = this.listAttachments(html ?? '');

@@ -210,6 +210,14 @@ writeFileSync(join(outDir, 'empty.msg'), Buffer.alloc(0));
 // ---------------------------------------------------------------------------
 
 const EML_SAMPLE = [
+  'Received: from mx.example.net (mx.example.net [203.0.113.9])',
+  '\tby destino.example.com with ESMTPS;',
+  '\tMon, 10 Jun 2024 12:00:45 +0000',
+  'Received: from origen.example.org (origen.example.org [198.51.100.7])',
+  '\tby mx.example.net with ESMTP;',
+  '\tMon, 10 Jun 2024 12:00:05 +0000',
+  'Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=example.com;',
+  '\tdkim=pass header.d=example.com; dmarc=pass',
   'From: "Ana Pérez" <ana.perez@example.com>',
   'To: "Oscar Henríquez" <oscar@example.com>',
   'Cc: dept@example.com',

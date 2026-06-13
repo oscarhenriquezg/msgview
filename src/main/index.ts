@@ -27,6 +27,8 @@ import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
 import { MsgAdapter } from './parser/MsgAdapter';
 import { addRecent, clearRecents, existingRecents } from './recents';
+import { parseAuthResults, parseReceivedChain } from './headers-analysis';
+import { sanitizeWithReport } from './parser/sanitize';
 import { buildSourceViewHtml } from './sourceview';
 import { parseBytes, parseFile, shutdownParser } from './parsing';
 
@@ -544,7 +546,19 @@ function registerIpc(): void {
     const truncated = body.length > MAX_SHOWN;
     if (truncated) body = body.slice(0, MAX_SHOWN);
 
-    sourceViewHtml = buildSourceViewHtml({ headers, body, truncated });
+    // Análisis técnico: ruta, autenticación, MAPI crudo y diff de sanitización.
+    const hops = parseReceivedChain(headers);
+    const auth = parseAuthResults(headers);
+    const mapiProps = isCfbf(state.buffer) ? MsgAdapter.getRawProperties(state.buffer) : null;
+    let sanitizeRemoved: string[] | null = null;
+    const originalHtml = isCfbf(state.buffer)
+      ? MsgAdapter.getEmlParts(state.buffer)?.bodyHtml
+      : body.trimStart().startsWith('<')
+        ? body
+        : undefined;
+    if (originalHtml) sanitizeRemoved = sanitizeWithReport(originalHtml).removed;
+
+    sourceViewHtml = buildSourceViewHtml({ headers, body, truncated, hops, auth, mapiProps, sanitizeRemoved });
 
     const win = new BrowserWindow({
       width: 980,
@@ -583,6 +597,10 @@ function registerIpc(): void {
     const text =
       which === 'headers' ? data.headers : which === 'body' ? data.body : `${data.headers}\n\n${data.body}`;
     clipboard.writeText(text);
+  });
+
+  ipcMain.on('source-copy-text', (_e, text: string) => {
+    if (typeof text === 'string') clipboard.writeText(text);
   });
 
   ipcMain.on('source-print', (e) => {

@@ -217,6 +217,10 @@ test('vista de código fuente: resaltado y búsqueda propios', async () => {
   // Cabeceras del .eml visibles y con resaltado de clave.
   await expect(src.locator('#hdr .hk').first()).toBeVisible();
   await expect(src.locator('#hdr')).toContainText('MIME-Version');
+  // Análisis de ruta: 2 saltos con demora calculada y chips de autenticación.
+  await expect(src.locator('table tbody tr')).toHaveCount(2);
+  await expect(src.locator('table tbody tr').nth(1).locator('td').last()).toHaveText('+40 s');
+  await expect(src.locator('.chip.ok').first()).toContainText('SPF=pass');
   // Búsqueda interna con contador y marca activa.
   await src.locator('#q').fill('boundary');
   await expect(src.locator('#count')).toContainText('1/');
