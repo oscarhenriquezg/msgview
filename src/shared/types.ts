@@ -136,8 +136,6 @@ export interface MsgViewerApi {
    * muestra la advertencia de confianza antes de salir del visor.
    */
   openExternal(url: string): void;
-  /** Menú nativo del botón PNG: guardar a archivo o copiar al portapapeles. */
-  askPngAction(): Promise<'save' | 'copy' | null>;
   /** Imprime el documento con el diálogo de impresión del sistema. */
   printDocument(): Promise<ExportResult>;
   /** Copia texto al portapapeles del sistema. */

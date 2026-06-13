@@ -23,7 +23,9 @@ const el = {
   errorDetail: $('error-detail'),
   viewer: $('viewer'),
   bodyFrame: $<HTMLIFrameElement>('body-frame'),
+  exportMenu: $('export-menu'),
   pngDialog: $<HTMLDialogElement>('png-dialog'),
+  pngTargetDialog: $<HTMLDialogElement>('png-target-dialog'),
   toasts: $('toasts'),
   findbar: $('findbar'),
   findInput: $<HTMLInputElement>('find-input'),
@@ -401,10 +403,54 @@ async function doSaveAs(): Promise<void> {
   else if (r.reason === 'error') toast(`${t('toast.saveError')}: ${r.detail ?? ''}`, undefined, true);
 }
 
-/** Botón PNG: menú nativo Guardar / Copiar al portapapeles. */
-async function pngButtonClicked(): Promise<void> {
-  const action = await api.askPngAction();
-  if (action) void exportDocument('png', false, action === 'copy' ? 'clipboard' : 'file');
+/** Formatos del menú Exportar, en el mismo orden que el menú de aplicación. */
+const EXPORT_FORMATS = [
+  'pdf', 'eml', 'png', 'html', 'txt', 'mht', 'json', 'zip'
+] as const;
+
+/** Botón PNG: diálogo para elegir entre guardar a archivo o copiar imagen. */
+function openPngTargetDialog(): void {
+  el.pngTargetDialog.showModal();
+}
+
+// --- Menú desplegable de Exportar -----------------------------------------
+
+function closeExportMenu(): void {
+  el.exportMenu.hidden = true;
+  $('btn-export').setAttribute('aria-expanded', 'false');
+}
+
+function toggleExportMenu(): void {
+  if (el.exportMenu.hidden) {
+    el.exportMenu.hidden = false;
+    $('btn-export').setAttribute('aria-expanded', 'true');
+    el.exportMenu.querySelector<HTMLButtonElement>('button')?.focus();
+  } else {
+    closeExportMenu();
+  }
+}
+
+function buildExportMenu(): void {
+  const items = EXPORT_FORMATS.map((fmt) => {
+    const item = document.createElement('button');
+    item.id = `export-opt-${fmt}`;
+    item.type = 'button';
+    item.setAttribute('role', 'menuitem');
+    const tag = document.createElement('span');
+    tag.className = 'fmt';
+    tag.textContent = fmt.toUpperCase();
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.textContent = t(`export.${fmt}`);
+    item.append(tag, hint);
+    item.addEventListener('click', () => {
+      closeExportMenu();
+      if (fmt === 'png') openPngTargetDialog();
+      else void exportDocument(fmt);
+    });
+    return item;
+  });
+  el.exportMenu.replaceChildren(...items);
 }
 
 /** FR-13: el contenido excede el límite → truncar o cancelar. */
@@ -659,14 +705,18 @@ async function init(): Promise<void> {
   $('unlink-body').textContent = t('unlink.body');
   $('btn-unlink-confirm').textContent = t('unlink.confirm');
   $('btn-unlink-cancel').textContent = t('unlink.cancel');
-  for (const fmt of ['pdf', 'eml', 'png'] as const) {
-    const b = $(`btn-export-${fmt}`);
-    b.innerHTML = `${fmt.toUpperCase()} ${ICONS.export}`;
-    b.title = t(`actions.export${fmt.charAt(0).toUpperCase()}${fmt.slice(1)}`);
-  }
+  const btnExport = $('btn-export');
+  btnExport.innerHTML = `${t('actions.export')} ${ICONS.export}`;
+  btnExport.title = t('actions.export');
+  buildExportMenu();
   setDocButtonsEnabled(false);
   $('btn-png-truncate').textContent = t('png.tooTall.truncate');
   $('btn-png-cancel').textContent = t('png.tooTall.cancel');
+  $('png-target-title').textContent = t('png.target.title');
+  $('png-target-body').textContent = t('png.target.body');
+  $('btn-png-target-file').textContent = t('png.target.file');
+  $('btn-png-target-clipboard').textContent = t('png.target.clipboard');
+  $('btn-png-target-cancel').textContent = t('png.target.cancel');
   $('btn-error-open').textContent = t('actions.open');
 
   $('btn-welcome-open').addEventListener('click', () => void openDialog());
@@ -712,9 +762,24 @@ async function init(): Promise<void> {
   $('btn-source').addEventListener('click', () => api.viewSource());
   $('btn-about').addEventListener('click', () => api.showAbout());
   $('btn-error-open').addEventListener('click', () => void openDialog());
-  $('btn-export-pdf').addEventListener('click', () => void exportDocument('pdf'));
-  $('btn-export-eml').addEventListener('click', () => void exportDocument('eml'));
-  $('btn-export-png').addEventListener('click', () => void pngButtonClicked());
+  $('btn-export').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleExportMenu();
+  });
+  // Cerrar el menú al hacer clic fuera o con Escape.
+  document.addEventListener('click', () => closeExportMenu());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.exportMenu.hidden) closeExportMenu();
+  });
+  $('btn-png-target-file').addEventListener('click', () => {
+    el.pngTargetDialog.close();
+    void exportDocument('png', false, 'file');
+  });
+  $('btn-png-target-clipboard').addEventListener('click', () => {
+    el.pngTargetDialog.close();
+    void exportDocument('png', false, 'clipboard');
+  });
+  $('btn-png-target-cancel').addEventListener('click', () => el.pngTargetDialog.close());
   $('btn-png-truncate').addEventListener('click', () => {
     el.pngDialog.close();
     void exportDocument('png', true, pngTarget);
@@ -739,7 +804,7 @@ async function init(): Promise<void> {
     } else if (action.type === 'find') openFindBar();
     else if (action.type === 'save-as') void doSaveAs();
     else if (action.type === 'copy-meta') copyMetadata(action.as);
-    else if (action.format === 'png') void pngButtonClicked();
+    else if (action.format === 'png') openPngTargetDialog();
     else void exportDocument(action.format);
   });
 

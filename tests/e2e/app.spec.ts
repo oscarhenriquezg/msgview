@@ -98,7 +98,8 @@ test.describe('exportaciones (FR-11/12/13, criterio 4)', () => {
     await launch(join(FIXTURES, 'html-basic.msg'));
     const out = join(dir, 'mensaje.pdf');
     await stubSaveDialog(out);
-    await page.locator('#btn-export-pdf').click();
+    await page.locator('#btn-export').click();
+    await page.locator('#export-opt-pdf').click();
     await expect(page.locator('.toast')).toContainText('PDF');
     expect(readFileSync(out).subarray(0, 5).toString()).toBe('%PDF-');
   });
@@ -124,7 +125,8 @@ test.describe('exportaciones (FR-11/12/13, criterio 4)', () => {
     await launch(join(FIXTURES, 'html-basic.msg'));
     const out = join(dir, 'mensaje.eml');
     await stubSaveDialog(out);
-    await page.locator('#btn-export-eml').click();
+    await page.locator('#btn-export').click();
+    await page.locator('#export-opt-eml').click();
     await expect(page.locator('.toast')).toContainText('EML');
     const eml = readFileSync(out, 'utf-8');
     expect(eml).toContain('From: ');
@@ -136,12 +138,10 @@ test.describe('exportaciones (FR-11/12/13, criterio 4)', () => {
     await launch(join(FIXTURES, 'html-basic.msg'));
     const out = join(dir, 'mensaje.png');
     await stubSaveDialog(out);
-    // El botón PNG abre un menú nativo (guardar/copiar); se fuerza "guardar".
-    await app.evaluate(({ ipcMain }) => {
-      ipcMain.removeHandler('png-menu');
-      ipcMain.handle('png-menu', () => 'save');
-    });
-    await page.locator('#btn-export-png').click();
+    // El menú Exportar → PNG abre un diálogo (archivo/portapapeles): se elige "archivo".
+    await page.locator('#btn-export').click();
+    await page.locator('#export-opt-png').click();
+    await page.locator('#btn-png-target-file').click();
     await expect(page.locator('.toast')).toContainText('PNG', { timeout: 20_000 });
     const sig = readFileSync(out).subarray(0, 8);
     expect([...sig]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -222,7 +222,7 @@ test('Nuevo: vuelve al estado inicial sin mensaje', async () => {
   await expect(page.locator('#header')).toBeHidden();
   // Los botones que requieren documento quedan deshabilitados.
   await expect(page.locator('#btn-save-as')).toBeDisabled();
-  await expect(page.locator('#btn-export-pdf')).toBeDisabled();
+  await expect(page.locator('#btn-export')).toBeDisabled();
 });
 
 test('vista de código fuente: resaltado y búsqueda propios', async () => {

@@ -451,26 +451,6 @@ function registerIpc(): void {
     }
   });
 
-  // Botón PNG: elegir entre guardar a archivo o copiar al portapapeles.
-  ipcMain.handle('png-menu', (e): Promise<'save' | 'copy' | null> => {
-    const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win || !docs.has(e.sender.id)) return Promise.resolve(null);
-    const es = app.getLocale().startsWith('es');
-    return new Promise((resolve) => {
-      Menu.buildFromTemplate([
-        { label: es ? 'Guardar como…' : 'Save as…', click: () => resolve('save') },
-        {
-          label: es ? 'Copiar al portapapeles' : 'Copy to clipboard',
-          click: () => resolve('copy')
-        }
-      ]).popup({
-        window: win,
-        // El callback de cierre llega antes que el click; se cede el turno.
-        callback: () => setTimeout(() => resolve(null), 150)
-      });
-    });
-  });
-
   // FR adicional: impresión con diálogo del sistema (menú Archivo).
   ipcMain.handle('print', (e): Promise<ExportResult> => {
     const state = docs.get(e.sender.id);

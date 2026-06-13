@@ -123,6 +123,41 @@ h1 {
   font-size: 12.5px;
 }
 .exportbtn svg { width: 14px; height: 14px; }
+
+/* ---------- Menú desplegable de Exportar ---------- */
+.export-wrap { position: relative; display: inline-flex; }
+.export-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.export-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.export-menu button .fmt { font-weight: 600; min-width: 38px; }
+.export-menu button .hint { color: var(--text-muted); font-size: 11.5px; }
+.export-menu button:hover,
+.export-menu button:focus-visible { background: var(--chip-bg); outline: none; }
+
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn:disabled:hover { border-color: var(--border); }
 .iconbtn[aria-pressed='true'] {

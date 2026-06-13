@@ -19,9 +19,11 @@
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-find" class="btn iconbtn" data-needs-doc></button>
       <span class="divider" aria-hidden="true"></span>
-      <button id="btn-export-pdf" class="btn exportbtn" data-needs-doc></button>
-      <button id="btn-export-eml" class="btn exportbtn" data-needs-doc></button>
-      <button id="btn-export-png" class="btn exportbtn" data-needs-doc></button>
+      <div id="export-wrap" class="export-wrap">
+        <button id="btn-export" class="btn exportbtn" data-needs-doc
+                aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu"></button>
+        <div id="export-menu" class="export-menu" role="menu" hidden></div>
+      </div>
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-zoom-in" class="btn iconbtn"></button>
       <button id="btn-zoom-reset" class="btn iconbtn"></button>
@@ -83,6 +85,17 @@
            los listeners de drag & drop al documento interno (FR-02b). -->
       <iframe id="body-frame" sandbox="allow-same-origin" title="Cuerpo del mensaje"></iframe>
     </main>
+
+    <!-- Exportar PNG: elegir destino (archivo o portapapeles) -->
+    <dialog id="png-target-dialog">
+      <h3 id="png-target-title"></h3>
+      <p id="png-target-body"></p>
+      <div class="dialog-actions">
+        <button id="btn-png-target-cancel" class="btn"></button>
+        <button id="btn-png-target-clipboard" class="btn"></button>
+        <button id="btn-png-target-file" class="btn primary"></button>
+      </div>
+    </dialog>
 
     <!-- FR-13: diálogo PNG demasiado alto -->
     <dialog id="png-dialog">
