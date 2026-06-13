@@ -208,6 +208,21 @@ test('Nuevo: vuelve al estado inicial sin mensaje', async () => {
   await expect(page.locator('#btn-export-pdf')).toBeDisabled();
 });
 
+test('vista de código fuente: resaltado y búsqueda propios', async () => {
+  await launch(join(FIXTURES, 'sample.eml'));
+  await expect(page.locator('#subject')).toHaveText('Correo EML de prueba');
+  const winPromise = app.waitForEvent('window', { timeout: 15000 });
+  await page.locator('#btn-source').click();
+  const src = await winPromise;
+  // Cabeceras del .eml visibles y con resaltado de clave.
+  await expect(src.locator('#hdr .hk').first()).toBeVisible();
+  await expect(src.locator('#hdr')).toContainText('MIME-Version');
+  // Búsqueda interna con contador y marca activa.
+  await src.locator('#q').fill('boundary');
+  await expect(src.locator('#count')).toContainText('1/');
+  await expect(src.locator('mark.act').first()).toBeVisible();
+});
+
 test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
   await launch(join(FIXTURES, 'hostile-script.msg'));
   await expect(page.locator('#subject')).toHaveText('XSS attempt');

@@ -1,7 +1,7 @@
 import { rmSync } from 'node:fs';
 import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, protocol, session, shell } from 'electron';
 import type {
   AttachmentSaveRequest,
   AttachmentSaveResult,
@@ -27,6 +27,7 @@ import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
 import { MsgAdapter } from './parser/MsgAdapter';
 import { addRecent, clearRecents, existingRecents } from './recents';
+import { buildSourceViewHtml } from './sourceview';
 import { parseBytes, parseFile, shutdownParser } from './parsing';
 
 /**
@@ -53,6 +54,11 @@ let mainWindow: BrowserWindow | null = null;
 let pendingPath: string | null = null;
 /** Contenido de la vista de código fuente (servido por msgprint://source). */
 let sourceViewHtml = '';
+/** Datos de cada ventana de código fuente, por webContents.id. */
+const sourceDocs = new Map<
+  number,
+  { headers: string; body: string; pageHtml: string; baseName: string }
+>();
 
 // Tests E2E: userData propio para no colisionar con una instancia en uso
 // (el lock de instancia única vive en userData).
@@ -521,7 +527,6 @@ function registerIpc(): void {
     const parent = BrowserWindow.fromWebContents(e.sender);
     if (!state || !parent) return;
     const es = app.getLocale().startsWith('es');
-    const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     const MAX_SHOWN = 2 * 1024 * 1024;
 
     let headers: string;
@@ -539,37 +544,73 @@ function registerIpc(): void {
     const truncated = body.length > MAX_SHOWN;
     if (truncated) body = body.slice(0, MAX_SHOWN);
 
-    const tHeaders = es ? 'Cabeceras de transporte' : 'Transport headers';
-    const tBody = es ? 'Cuerpo (código fuente)' : 'Body (source)';
-    const tNone = es ? '(no disponibles en este .msg)' : '(not available in this .msg)';
-    const tTrunc = es ? '… (truncado a 2 MB)' : '… (truncated to 2 MB)';
-    sourceViewHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
-<style>
-  :root { color-scheme: light dark; }
-  body { margin: 0; background: Canvas; color: CanvasText;
-         font-family: ui-monospace, 'Cascadia Code', Menlo, monospace; font-size: 12px; }
-  h2 { font-family: system-ui, sans-serif; font-size: 13px; position: sticky; top: 0;
-       background: Canvas; margin: 0; padding: 10px 16px; border-bottom: 1px solid GrayText; }
-  pre { margin: 0; padding: 12px 16px 24px; white-space: pre-wrap; word-break: break-all; }
-</style></head><body>
-<h2>${tHeaders}</h2><pre>${headers ? esc(headers) : tNone}</pre>
-<h2>${tBody}</h2><pre>${esc(body)}${truncated ? tTrunc : ''}</pre>
-</body></html>`;
+    sourceViewHtml = buildSourceViewHtml({ headers, body, truncated });
 
     const win = new BrowserWindow({
-      width: 900,
-      height: 700,
+      width: 980,
+      height: 720,
       autoHideMenuBar: true,
+      icon: APP_ICON_PATH,
       title: `${es ? 'Código fuente' : 'Source'} — ${state.document.metadata.subject}`,
       show: false,
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+      webPreferences: {
+        preload: join(import.meta.dirname, '../preload/source.mjs'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
     });
+    sourceDocs.set(win.webContents.id, {
+      headers,
+      body,
+      pageHtml: sourceViewHtml,
+      baseName: (state.document.metadata.subject || 'mensaje').replace(/[\\/:*?"<>|]/g, '_').slice(0, 100)
+    });
+    const wcId = win.webContents.id;
+    win.on('closed', () => sourceDocs.delete(wcId));
+    installContextMenu(win);
     win.once('ready-to-show', () => win.show());
     setTimeout(() => {
       if (!win.isDestroyed() && !win.isVisible()) win.show();
     }, 800);
     void win.loadURL('msgprint://source/index.html');
+  });
+
+  // Acciones de la ventana de código fuente.
+  ipcMain.on('source-copy', (e, which: 'headers' | 'body' | 'all') => {
+    const data = sourceDocs.get(e.sender.id);
+    if (!data) return;
+    const text =
+      which === 'headers' ? data.headers : which === 'body' ? data.body : `${data.headers}\n\n${data.body}`;
+    clipboard.writeText(text);
+  });
+
+  ipcMain.on('source-print', (e) => {
+    e.sender.print({ printBackground: true }, () => {});
+  });
+
+  ipcMain.handle('source-export', async (e, format: 'pdf' | 'html' | 'txt'): Promise<ExportResult> => {
+    const data = sourceDocs.get(e.sender.id);
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!data || !win) return { ok: false, reason: 'error', detail: 'Sin datos' };
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      defaultPath: `${data.baseName}-source.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }]
+    });
+    if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
+    try {
+      if (format === 'pdf') {
+        const pdf = await e.sender.printToPDF({ printBackground: true });
+        await writeFile(filePath, pdf);
+      } else if (format === 'html') {
+        await writeFile(filePath, data.pageHtml, 'utf-8');
+      } else {
+        await writeFile(filePath, `${data.headers}\n\n${data.body}`, 'utf-8');
+      }
+      return { ok: true, filePath };
+    } catch (err) {
+      return { ok: false, reason: 'error', detail: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   ipcMain.on('show-about', (e) => {

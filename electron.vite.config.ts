@@ -20,6 +20,14 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: { '@shared': resolve('src/shared') }
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/preload/index.ts'),
+          source: resolve('src/preload/source.ts')
+        }
+      }
     }
   },
   renderer: {
