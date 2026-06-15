@@ -1,5 +1,6 @@
 import type { ExportFormat, LoadResult, MsgAttachmentMeta, MsgDocument } from '@shared/types';
 import { MAX_PNG_HEIGHT } from '@shared/types';
+import { isExecutableAttachment } from '@shared/executable';
 import { ICONS } from './icons';
 import { initI18n, locale, t } from './i18n';
 
@@ -270,6 +271,19 @@ function makeChip(a: MsgAttachmentMeta): HTMLElement {
     e.preventDefault();
     api.startAttachmentDrag(a.id);
   });
+
+  // Aviso de adjunto ejecutable: icono ⚠ y marca en el chip; la advertencia
+  // explícita al abrir/guardar la impone main (confirmExecutableAction).
+  const executable = isExecutableAttachment(a.extension);
+  if (executable) {
+    chip.classList.add('exec');
+    chip.title = `${a.fileName} — ${t('attachments.executable')}`;
+    const warn = document.createElement('span');
+    warn.className = 'exec-warn';
+    warn.textContent = '⚠️';
+    warn.setAttribute('aria-label', t('attachments.executable'));
+    chip.append(warn);
+  }
 
   const icon = document.createElement('span');
   icon.className = 'icon';

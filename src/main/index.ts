@@ -13,6 +13,7 @@ import type {
   RemoteImageResult
 } from '@shared/types';
 import { MAX_PNG_HEIGHT } from '@shared/types';
+import { isExecutableAttachment } from '@shared/executable';
 import {
   exportEml,
   exportPdf,
@@ -460,6 +461,21 @@ function registerIpc(): void {
           : state.document.attachments.filter((a) => !a.isInline);
       if (targets.length === 0) return { ok: false, reason: 'error', detail: 'Sin adjuntos' };
 
+      // Advertencia si alguno de los adjuntos a guardar es ejecutable.
+      const execs = targets.filter((a) => isExecutableAttachment(a.extension));
+      if (execs.length > 0) {
+        const es = app.getLocale().startsWith('es');
+        const label =
+          execs.length === 1
+            ? `"${execs[0]!.fileName}"`
+            : es
+              ? `${execs.length} archivos ejecutables`
+              : `${execs.length} executable files`;
+        if (!(await confirmExecutableAction(win, label, 'save'))) {
+          return { ok: false, reason: 'cancelled' };
+        }
+      }
+
       try {
         if (targets.length === 1) {
           const target = targets[0]!;
@@ -812,6 +828,10 @@ async function openAttachmentInTemp(
   attachmentId: number
 ): Promise<void> {
   const es = app.getLocale().startsWith('es');
+  const meta = state.document.attachments.find((a) => a.id === attachmentId);
+  if (meta && isExecutableAttachment(meta.extension)) {
+    if (!(await confirmExecutableAction(win, `"${meta.fileName}"`, 'open'))) return;
+  }
   const data = await getAnyAttachment(state.buffer, attachmentId);
   if (!data) {
     notify(win, es ? 'Adjunto ilegible' : 'Unreadable attachment', undefined, true);
@@ -839,6 +859,9 @@ async function saveSingleAttachment(
   const es = app.getLocale().startsWith('es');
   const meta = state.document.attachments.find((a) => a.id === attachmentId);
   if (!meta) return;
+  if (isExecutableAttachment(meta.extension)) {
+    if (!(await confirmExecutableAction(win, `"${meta.fileName}"`, 'save'))) return;
+  }
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     defaultPath: meta.fileName
   });
@@ -854,6 +877,46 @@ async function saveSingleAttachment(
   } catch (err) {
     notify(win, err instanceof Error ? err.message : String(err), undefined, true);
   }
+}
+
+/**
+ * Advertencia explícita antes de abrir o guardar un adjunto ejecutable: puede
+ * correr código y modificar el equipo. Devuelve true si el usuario decide
+ * continuar. Acción segura por defecto (botón Cancelar resaltado).
+ */
+async function confirmExecutableAction(
+  win: BrowserWindow,
+  label: string,
+  action: 'open' | 'save'
+): Promise<boolean> {
+  const es = app.getLocale().startsWith('es');
+  const proceed = es
+    ? action === 'open'
+      ? 'Abrir de todos modos'
+      : 'Guardar de todos modos'
+    : action === 'open'
+      ? 'Open anyway'
+      : 'Save anyway';
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'warning',
+    buttons: [es ? 'Cancelar' : 'Cancel', proceed],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+    title: es ? 'Archivo ejecutable' : 'Executable file',
+    message: es
+      ? `${label} es un archivo ejecutable`
+      : `${label} is an executable file`,
+    detail: es
+      ? 'Abrir o ejecutar este archivo puede correr código y hacer cambios en tu ' +
+        'equipo: instalar programas, modificar o cifrar tus archivos, o robar ' +
+        'datos. Continúa solo si confías plenamente en el remitente y esperabas ' +
+        'este adjunto.'
+      : 'Opening or running this file can execute code and make changes to your ' +
+        'computer: install software, modify or encrypt your files, or steal data. ' +
+        'Continue only if you fully trust the sender and expected this attachment.'
+  });
+  return response === 1;
 }
 
 /** Toast en el renderer de la ventana indicada (UI-06). */

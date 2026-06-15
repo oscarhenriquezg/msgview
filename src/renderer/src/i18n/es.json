@@ -43,6 +43,7 @@
   "attachments.saveAll": "Guardar todos",
   "attachments.openMsg": "Abrir mensaje",
   "attachments.dragHint": "arrástralo fuera para guardarlo",
+  "attachments.executable": "Archivo ejecutable: puede correr código y modificar tu equipo",
   "toast.saved": "Guardado",
   "toast.savedCount": "{n} archivos guardados",
   "toast.exported": "Exportado",
