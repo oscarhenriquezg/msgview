@@ -27,8 +27,12 @@ const el = {
   pngDialog: $<HTMLDialogElement>('png-dialog'),
   leaveDialog: $<HTMLDialogElement>('leave-dialog'),
   leaveUrl: $<HTMLTextAreaElement>('leave-url'),
+  leaveMismatch: $('leave-mismatch'),
+  remoteImgDialog: $<HTMLDialogElement>('remote-img-dialog'),
+  remoteImgUrl: $<HTMLTextAreaElement>('remote-img-url'),
   aboutDialog: $<HTMLDialogElement>('about-dialog'),
   associateDialog: $<HTMLDialogElement>('associate-dialog'),
+  assocOfferDialog: $<HTMLDialogElement>('assoc-offer-dialog'),
   pngTargetDialog: $<HTMLDialogElement>('png-target-dialog'),
   toasts: $('toasts'),
   findbar: $('findbar'),
@@ -370,14 +374,27 @@ function renderBody(sanitizedHtml: string): void {
         openFindBar();
       }
     });
-    // Advertencia anti-phishing: salir del visor requiere confirmación.
     doc.addEventListener('click', (e) => {
-      const a = (e.target as Element | null)?.closest?.('a[href]');
+      const target = e.target as Element | null;
+      // Imagen remota bloqueada: ofrecer cargarla con aviso de rastreo.
+      const img = target?.closest?.('img[data-blocked-src]') as HTMLImageElement | null;
+      if (img) {
+        e.preventDefault();
+        confirmRemoteImage(img);
+        return;
+      }
+      // Advertencia anti-phishing: salir del visor requiere confirmación.
+      const a = target?.closest?.('a[href]');
       if (!a) return;
       e.preventDefault();
       if (linksDisabled) return;
       const href = a.getAttribute('href') ?? '';
-      if (/^(https?:|mailto:)/i.test(href)) confirmLeave(href);
+      if (!/^(https?:|mailto:)/i.test(href)) return;
+      // ¿El texto visible aparenta un dominio distinto al destino real?
+      const real = hostOf(href);
+      const shown = a.querySelector('img') ? '' : displayedHost(a.textContent ?? '');
+      const mismatch = hostsDiffer(shown, real) ? { shown, real } : null;
+      confirmLeave(href, mismatch);
     });
     applyMismatchState();
     applyLinkState();
@@ -401,6 +418,8 @@ function renderBody(sanitizedHtml: string): void {
     background: #fde7e6; text-decoration: underline wavy #d93025;
   }
   a.__link-mismatch::after { content: " \\26A0"; color: #d93025; font-size: 0.9em; }
+  /* Imagen remota bloqueada: clic para cargarla (con aviso de rastreo). */
+  img[data-blocked-src] { cursor: pointer; }
   /* Accesibilidad (WCAG 1.4.3): modo oscuro forzado. Se imponen fondo oscuro y
      texto claro con !important, que gana a los colores inline del correo
      (pensados para fondo claro y que de otro modo quedarían ilegibles). Así se
@@ -453,8 +472,8 @@ function hostsDiffer(shown: string, real: string): boolean {
   return !real.endsWith('.' + shown) && !shown.endsWith('.' + real);
 }
 
-/** Resaltado de enlaces engañosos: activable/desactivable como Unlink. */
-let mismatchHighlight = true;
+/** Resaltado de enlaces engañosos: desactivado por defecto, activable como Unlink. */
+let mismatchHighlight = false;
 
 /** Aplica el estado actual del aviso de enlaces engañosos al cuerpo y al botón. */
 function applyMismatchState(): void {
@@ -533,14 +552,68 @@ function openLinkwarnDialog(): void {
 /** URL pendiente de confirmar en el diálogo "Salir del visor". */
 let pendingLeaveUrl = '';
 
-/** Confirmación anti-phishing antes de abrir un enlace externo (FR-08). */
-function confirmLeave(url: string): void {
+/**
+ * Confirmación anti-phishing antes de abrir un enlace externo (FR-08). Si el
+ * enlace es engañoso (texto que aparenta un dominio distinto al real), el mismo
+ * diálogo explica qué es un enlace engañoso y muestra ambos dominios.
+ */
+function confirmLeave(url: string, mismatch: { shown: string; real: string } | null): void {
   pendingLeaveUrl = url;
   el.leaveUrl.value = url;
   el.leaveUrl.scrollTop = 0;
+  if (mismatch) {
+    el.leaveMismatch.hidden = false;
+    el.leaveMismatch.textContent =
+      `⚠ ${t('link.mismatch')}: ${t('link.shows')} «${mismatch.shown}» · ` +
+      `${t('link.goesTo')} ${mismatch.real}. ${t('leave.mismatchExplain')}`;
+  } else {
+    el.leaveMismatch.hidden = true;
+    el.leaveMismatch.textContent = '';
+  }
   el.leaveDialog.showModal();
   // El foco arranca en Cancelar (acción segura por defecto).
   $('btn-leave-cancel').focus();
+}
+
+/** Imagen remota bloqueada pendiente de cargar (diálogo de aviso de rastreo). */
+let pendingRemoteImg: HTMLImageElement | null = null;
+
+/**
+ * Aviso antes de descargar una imagen remota: explica que el servidor externo
+ * puede rastrear al usuario (píxel de seguimiento). La descarga solo ocurre
+ * tras la confirmación explícita (única excepción al bloqueo de red).
+ */
+function confirmRemoteImage(img: HTMLImageElement): void {
+  const url = img.getAttribute('data-blocked-src') ?? '';
+  if (!url) return;
+  pendingRemoteImg = img;
+  el.remoteImgUrl.value = url;
+  el.remoteImgUrl.scrollTop = 0;
+  el.remoteImgDialog.showModal();
+  $('btn-remote-img-cancel').focus();
+}
+
+/** Descarga la imagen remota confirmada y la inserta en su sitio. */
+function loadPendingRemoteImage(): void {
+  const img = pendingRemoteImg;
+  pendingRemoteImg = null;
+  const url = img?.getAttribute('data-blocked-src');
+  if (!img || !url) return;
+  void api.loadRemoteImage(url).then((res) => {
+    if (res.ok) {
+      img.setAttribute('src', res.dataUri);
+      img.removeAttribute('data-blocked-src');
+      img.removeAttribute('title');
+    } else {
+      const reason =
+        res.reason === 'too-large'
+          ? t('remoteImg.tooLarge')
+          : res.reason === 'not-image'
+            ? t('remoteImg.notImage')
+            : t('remoteImg.error');
+      toast(reason, undefined, true);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -965,12 +1038,24 @@ async function init(): Promise<void> {
   $('associate-icon').innerHTML = ICONS.open;
   $('associate-title').textContent = t('associate.title');
   $('btn-associate-cancel').textContent = t('associate.cancel');
+  $('assoc-offer-icon').innerHTML = ICONS.open;
+  $('assoc-offer-title').textContent = t('assocOffer.title');
+  $('assoc-offer-body').textContent = t('assocOffer.body');
+  $('assoc-offer-dontask-label').textContent = t('assocOffer.dontAsk');
+  $('btn-assoc-offer-no').textContent = t('assocOffer.no');
+  $('btn-assoc-offer-yes').textContent = t('assocOffer.yes');
   $('leave-icon').innerHTML = ICONS.shieldAlert;
   $('leave-title').textContent = t('leave.title');
   $('leave-body').textContent = t('leave.body');
   $('leave-warn').textContent = t('leave.warn');
   $('btn-leave-open').textContent = t('leave.open');
   $('btn-leave-cancel').textContent = t('leave.cancel');
+  $('remote-img-icon').innerHTML = ICONS.shieldAlert;
+  $('remote-img-title').textContent = t('remoteImg.title');
+  $('remote-img-body').textContent = t('remoteImg.body');
+  $('remote-img-warn').textContent = t('remoteImg.warn');
+  $('btn-remote-img-load').textContent = t('remoteImg.load');
+  $('btn-remote-img-cancel').textContent = t('remoteImg.cancel');
   const btnExport = $('btn-export');
   btnExport.innerHTML = `${t('actions.export')} ${ICONS.export}`;
   btnExport.title = t('actions.export');
@@ -1038,6 +1123,14 @@ async function init(): Promise<void> {
   $('btn-leave-cancel').addEventListener('click', () => {
     el.leaveDialog.close();
     pendingLeaveUrl = '';
+  });
+  $('btn-remote-img-load').addEventListener('click', () => {
+    el.remoteImgDialog.close();
+    loadPendingRemoteImage();
+  });
+  $('btn-remote-img-cancel').addEventListener('click', () => {
+    el.remoteImgDialog.close();
+    pendingRemoteImg = null;
   });
   const copySubject = (): void => {
     const subject = currentDoc?.metadata.subject;

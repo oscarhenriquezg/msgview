@@ -122,10 +122,24 @@
       <h3 id="leave-title"></h3>
       <p id="leave-body"></p>
       <textarea id="leave-url" class="url-box" readonly rows="3"></textarea>
+      <p id="leave-mismatch" class="leave-mismatch" hidden></p>
       <p id="leave-warn" class="muted"></p>
       <div class="dialog-actions">
         <button id="btn-leave-cancel" class="btn"></button>
         <button id="btn-leave-open" class="btn primary"></button>
+      </div>
+    </dialog>
+
+    <!-- Aviso de rastreo al cargar una imagen remota bajo demanda -->
+    <dialog id="remote-img-dialog">
+      <div class="dialog-icon" id="remote-img-icon" aria-hidden="true"></div>
+      <h3 id="remote-img-title"></h3>
+      <p id="remote-img-body"></p>
+      <textarea id="remote-img-url" class="url-box" readonly rows="3"></textarea>
+      <p id="remote-img-warn" class="muted"></p>
+      <div class="dialog-actions">
+        <button id="btn-remote-img-cancel" class="btn"></button>
+        <button id="btn-remote-img-load" class="btn primary"></button>
       </div>
     </dialog>
 

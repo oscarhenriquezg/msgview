@@ -17,7 +17,7 @@ nunca abandona tu equipo.
 | **Formatos de entrada** | `.msg` (Outlook), `.eml` (RFC 5322) y `.emlx` (Apple Mail), con **detección por contenido** (una extensión renombrada se abre igual) |
 | **Metadatos completos** | Asunto, remitente, destinatarios (Para/CC/CCO), fechas de envío y recepción |
 | **Cuerpo en cascada** | HTML nativo → RTF des-encapsulado (recupera el HTML original de Outlook) → RTF aproximado → texto plano |
-| **Imágenes incrustadas** | Las `cid:` se renderizan en su posición; las remotas se bloquean (placeholder) |
+| **Imágenes incrustadas** | Las `cid:` se renderizan en su posición; las remotas se bloquean (placeholder) y solo se cargan con un clic, tras un aviso de rastreo |
 | **Mensajes anidados** | Un `.msg`/`.eml` adjunto se abre en **ventana propia** para comparar lado a lado |
 | **Direcciones de Exchange** | Resuelve el SMTP real en vez del DN X.500 interno (`/o=ExchangeLabs/...`) |
 | **Idioma y tema** | Español/inglés según el sistema · claro/oscuro automático |
@@ -27,9 +27,10 @@ nunca abandona tu equipo.
 | Característica | Detalle |
 |---|---|
 | **Contenido hostil** | El cuerpo se sanitiza (DOMPurify) y se aísla en un iframe sandbox sin scripts + CSP restrictiva |
-| **Sin red** | Bloqueo total de tráfico saliente en capa de sesión (verificable con `tcpdump`). Cero telemetría |
-| **Anti-phishing** | La URL real de cada enlace se ve al pasar el cursor; el clic exige confirmar antes de salir al navegador |
-| **Enlaces engañosos** | Se resaltan los enlaces cuyo texto aparenta un dominio distinto al destino real (`<a>paypal.com</a>` → `evil.com`) |
+| **Sin red** | Cero tráfico saliente automático: bloqueo en capa de sesión (verificable con `tcpdump`), cero telemetría. La única excepción es la descarga de una imagen remota que tú pidas explícitamente |
+| **Imágenes remotas** | Bloqueadas por defecto. Al pulsar el placeholder, un aviso explica el rastreo (píxel de seguimiento: IP, fecha/hora de lectura) antes de descargarla |
+| **Anti-phishing** | La URL real de cada enlace se ve al pasar el cursor; el clic exige confirmar antes de salir al navegador, y si el enlace es engañoso la propia advertencia lo explica |
+| **Enlaces engañosos** | Resaltado opcional de los enlaces cuyo texto aparenta un dominio distinto al destino real (`<a>paypal.com</a>` → `evil.com`) |
 | **Unlink** | Un botón deja todos los enlaces inertes (tachados) para inspeccionar correos sospechosos sin riesgo |
 | **Adjuntos bajo control** | Solo se escriben a disco por acción explícita; los temporales de "Abrir" se purgan al salir |
 

@@ -9,7 +9,8 @@ import type {
   ExportRequest,
   ExportResult,
   LoadResult,
-  MsgDocument
+  MsgDocument,
+  RemoteImageResult
 } from '@shared/types';
 import { MAX_PNG_HEIGHT } from '@shared/types';
 import {
@@ -701,6 +702,39 @@ function registerIpc(): void {
 
   ipcMain.on('show-in-folder', (_e, path: string) => {
     if (typeof path === 'string' && path) shell.showItemInFolder(path);
+  });
+
+  // Imágenes remotas bajo demanda: ÚNICA excepción al bloqueo de red (NFR-03),
+  // y solo tras consentimiento explícito en el renderer. Se usa el fetch de
+  // Node (no la pila de Chromium): no pasa por el filtro de sesión, por eso
+  // aquí se revalida protocolo, tipo y tamaño antes de devolver la imagen.
+  ipcMain.handle('load-remote-image', async (_e, url: string): Promise<RemoteImageResult> => {
+    if (typeof url !== 'string') return { ok: false, reason: 'error' };
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return { ok: false, reason: 'error' };
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { ok: false, reason: 'error' };
+    }
+    const MAX_BYTES = 25 * 1024 * 1024;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const resp = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+      if (!resp.ok) return { ok: false, reason: 'error' };
+      const type = (resp.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
+      if (!type.startsWith('image/')) return { ok: false, reason: 'not-image' };
+      const buf = Buffer.from(await resp.arrayBuffer());
+      if (buf.length === 0 || buf.length > MAX_BYTES) return { ok: false, reason: 'too-large' };
+      return { ok: true, dataUri: `data:${type};base64,${buf.toString('base64')}` };
+    } catch {
+      return { ok: false, reason: 'error' };
+    } finally {
+      clearTimeout(timer);
+    }
   });
 
   ipcMain.handle('get-locale', () => app.getLocale());

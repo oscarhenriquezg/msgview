@@ -94,6 +94,11 @@ export type AttachmentSaveResult =
 /** Límite FR-13. */
 export const MAX_PNG_HEIGHT = 20_000;
 
+/** Resultado de descargar una imagen remota bajo demanda (consentida). */
+export type RemoteImageResult =
+  | { ok: true; dataUri: string }
+  | { ok: false; reason: 'error' | 'too-large' | 'not-image' };
+
 /** API expuesta al renderer vía contextBridge (preload). */
 export interface MsgViewerApi {
   /** Abre el diálogo nativo de "Abrir archivo" y carga el .msg elegido. */
@@ -145,6 +150,12 @@ export interface MsgViewerApi {
   printDocument(): Promise<ExportResult>;
   /** Copia texto al portapapeles del sistema. */
   copyText(text: string): void;
+  /**
+   * Descarga una imagen remota previamente bloqueada, bajo consentimiento
+   * explícito del usuario. Única excepción al bloqueo de red (NFR-03): main
+   * la trae por Node fetch y la devuelve como data: URI para el iframe.
+   */
+  loadRemoteImage(url: string): Promise<RemoteImageResult>;
   /** Menú nativo Abrir/Guardar para un adjunto (clic en el chip). */
   showAttachmentMenu(attachmentId: number): void;
   /** Arrastrar un adjunto fuera de la app (drag-out nativo a archivos/correo). */

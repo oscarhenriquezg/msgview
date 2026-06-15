@@ -324,18 +324,20 @@ test('la fecha de envío es copiable con aviso inmediato', async () => {
 test('toggle de enlaces engañosos con diálogo tipo Unlink', async () => {
   await launch(join(FIXTURES, 'phishing-link.msg'));
   const body = page.frameLocator('#body-frame');
-  await expect(body.locator('a#bad')).toHaveClass(/__link-mismatch/);
-  // Desactivar: botón → diálogo de confirmación → confirmar.
+  // Desactivado por defecto: sin resaltado.
+  await expect(body.locator('a#bad')).not.toHaveClass(/__link-mismatch/);
+  await expect(page.locator('#btn-link-warn')).toHaveAttribute('aria-pressed', 'false');
+  // Activar: botón → diálogo de confirmación → confirmar.
   await page.locator('#btn-link-warn').click();
   await expect(page.locator('#linkwarn-dialog')).toBeVisible();
   await page.locator('#btn-linkwarn-confirm').click();
-  await expect(body.locator('a#bad')).not.toHaveClass(/__link-mismatch/);
-  await expect(page.locator('#btn-link-warn')).toHaveAttribute('aria-pressed', 'false');
-  // Reactivar de la misma forma.
-  await page.locator('#btn-link-warn').click();
-  await page.locator('#btn-linkwarn-confirm').click();
   await expect(body.locator('a#bad')).toHaveClass(/__link-mismatch/);
   await expect(page.locator('#btn-link-warn')).toHaveAttribute('aria-pressed', 'true');
+  // Desactivar de la misma forma.
+  await page.locator('#btn-link-warn').click();
+  await page.locator('#btn-linkwarn-confirm').click();
+  await expect(body.locator('a#bad')).not.toHaveClass(/__link-mismatch/);
+  await expect(page.locator('#btn-link-warn')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('Acerca de: diálogo in-app con la versión', async () => {
@@ -405,6 +407,9 @@ test('resalta enlaces cuyo texto aparenta otro dominio (anti-phishing)', async (
   await launch(join(FIXTURES, 'phishing-link.msg'));
   await expect(page.locator('#subject')).toHaveText('Verifica tu cuenta');
   const body = page.frameLocator('#body-frame');
+  // El resaltado está desactivado por defecto: activarlo primero.
+  await page.locator('#btn-link-warn').click();
+  await page.locator('#btn-linkwarn-confirm').click();
   // El texto dice paypal.com pero el href va a evil-phish.example → marcado.
   await expect(body.locator('a#bad')).toHaveClass(/__link-mismatch/);
   await expect(body.locator('a#bad')).toHaveAttribute('title', /paypal\.com.*evil-phish\.example/);
@@ -444,4 +449,21 @@ test('sin tráfico de red saliente durante apertura (NFR-03)', async () => {
     .locator('img')
     .evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src).filter((s) => /^https?:/.test(s)));
   expect(remoteImgs).toEqual([]);
+});
+
+test('imagen remota bloqueada: clic ofrece cargarla con aviso de rastreo', async () => {
+  await launch(join(FIXTURES, 'hostile-script.msg'));
+  await expect(page.locator('#subject')).toHaveText('XSS attempt');
+  const body = page.frameLocator('#body-frame');
+  const blocked = body.locator('img[data-blocked-src]').first();
+  await expect(blocked).toHaveCount(1);
+  // Clic en el placeholder: aparece el aviso con la URL y la advertencia.
+  await blocked.click();
+  await expect(page.locator('#remote-img-dialog')).toBeVisible();
+  await expect(page.locator('#remote-img-url')).toHaveValue(/^https?:/);
+  await expect(page.locator('#remote-img-warn')).not.toBeEmpty();
+  // Cancelar: nada se descarga, la imagen sigue bloqueada.
+  await page.locator('#btn-remote-img-cancel').click();
+  await expect(page.locator('#remote-img-dialog')).toBeHidden();
+  await expect(blocked).toHaveCount(1);
 });

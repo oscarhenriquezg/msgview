@@ -14,10 +14,11 @@ const purifier = createDOMPurify(window);
 const REMOTE_IMG_PLACEHOLDER =
   'data:image/svg+xml;base64,' +
   Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100" viewBox="0 0 160 100">` +
-      `<rect width="160" height="100" fill="#e8e8e8" stroke="#bbb" stroke-dasharray="4"/>` +
-      `<text x="80" y="46" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">Imagen remota</text>` +
-      `<text x="80" y="62" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">bloqueada</text>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="110" viewBox="0 0 160 110">` +
+      `<rect width="160" height="110" fill="#e8e8e8" stroke="#bbb" stroke-dasharray="4"/>` +
+      `<text x="80" y="42" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">Imagen remota</text>` +
+      `<text x="80" y="58" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">bloqueada</text>` +
+      `<text x="80" y="82" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3b82f6">Clic para cargar</text>` +
       `</svg>`
   ).toString('base64');
 

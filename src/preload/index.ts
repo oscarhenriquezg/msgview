@@ -25,6 +25,7 @@ const api: MsgViewerApi & { openDroppedFile(file: File): Promise<LoadResult> } =
     ipcRenderer.on('menu-action', (_event, action) => cb(action));
   },
   copyText: (text) => clipboard.writeText(text),
+  loadRemoteImage: (url) => ipcRenderer.invoke('load-remote-image', url),
   saveAs: () => ipcRenderer.invoke('save-as'),
   clearDocument: () => ipcRenderer.invoke('clear-document'),
   viewSource: () => ipcRenderer.send('view-source'),
