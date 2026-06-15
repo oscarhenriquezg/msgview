@@ -141,6 +141,12 @@ async function exportToPath(
 const customUserData = process.env['MSG_VIEWER_USER_DATA'];
 if (customUserData) app.setPath('userData', customUserData);
 
+// Evita el diálogo "Choose password for new keyring" en Linux (GNOME Keyring/
+// libsecret). La app es 100% offline y no almacena cookies ni credenciales, así
+// que el llavero del sistema no aporta nada; Chromium usa el almacén "basic".
+// Debe fijarse antes de que la app esté lista.
+app.commandLine.appendSwitch('password-store', 'basic');
+
 // FR-03: instancia única; la segunda invocación entrega su argv a la primera.
 const locked = app.requestSingleInstanceLock();
 if (!locked) {
