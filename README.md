@@ -63,17 +63,20 @@ nunca abandona tu equipo.
 
 ## Instalación
 
-### Instalación rápida en Linux (una línea)
+### Instalación rápida (una línea)
 
-Descarga el último AppImage, lo deja en `~/.local/bin` y lo añade al menú de aplicaciones:
+Funciona en **Linux y macOS**; el script detecta el sistema y descarga el artefacto adecuado. Sin permisos de root:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/oscarhenriquezg/msgview/main/scripts/install.sh)"
 ```
 
-> Los AppImage requieren **FUSE2** (`libfuse2`). Si al arrancar ves un error de
-> FUSE, instálalo (`sudo apt install libfuse2` / `sudo dnf install fuse fuse-libs`)
-> o ejecuta con `~/.local/bin/MSGViewer.AppImage --appimage-extract-and-run`.
+- **Linux** — deja el AppImage en `~/.local/bin` y crea la entrada en el menú de aplicaciones.
+- **macOS** — instala `MSG Viewer.app` en `~/Applications` y le quita la cuarentena de Gatekeeper (la app no está firmada).
+
+> En Linux los AppImage requieren **FUSE2** (`libfuse2`). Si al arrancar ves un
+> error de FUSE, instálalo (`sudo apt install libfuse2` / `sudo dnf install fuse
+> fuse-libs`) o ejecuta con `~/.local/bin/MSGViewer.AppImage --appimage-extract-and-run`.
 
 ### Descarga manual
 
