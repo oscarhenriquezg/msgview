@@ -350,7 +350,7 @@ dialog p { font-size: 13.5px; }
 }
 .url-box:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* Aviso de enlace engañoso dentro del diálogo "Salir del visor". */
+/* Aviso de enlace engañoso/homográfico dentro del diálogo "Salir del visor". */
 .leave-mismatch {
   margin: 8px 0 2px;
   padding: 8px 10px;
@@ -360,6 +360,7 @@ dialog p { font-size: 13.5px; }
   color: #8a1c14;
   font-size: 12.5px;
   line-height: 1.4;
+  white-space: pre-line; /* respeta el salto entre avisos múltiples */
 }
 
 /* Diálogo "Acerca de" */

@@ -393,8 +393,10 @@ function renderBody(sanitizedHtml: string): void {
       // ¿El texto visible aparenta un dominio distinto al destino real?
       const real = hostOf(href);
       const shown = a.querySelector('img') ? '' : displayedHost(a.textContent ?? '');
-      const mismatch = hostsDiffer(shown, real) ? { shown, real } : null;
-      confirmLeave(href, mismatch);
+      const deceptive = hostsDiffer(shown, real) ? { shown, real } : null;
+      // Homografía IDN: anotada por main en data-homograph (host decodificado).
+      const homograph = a.getAttribute('data-homograph');
+      confirmLeave(href, { deceptive, homograph });
     });
     applyMismatchState();
     applyLinkState();
@@ -502,6 +504,14 @@ function markLinkDiscrepancies(doc: Document): void {
   for (const a of Array.from(doc.querySelectorAll('a[href]'))) {
     const real = hostOf(a.getAttribute('href') ?? '');
     if (!real) continue; // solo http/https
+    // Homografía IDN (anotada por main): se marca aunque el texto coincida,
+    // porque el host "parece" latino pero usa otra escritura.
+    const homograph = a.getAttribute('data-homograph');
+    if (homograph) {
+      a.classList.add('__link-mismatch');
+      a.setAttribute('title', `${t('link.homograph')}: ${t('link.looksLike')} ${homograph}`);
+      continue;
+    }
     // Si el enlace contiene una imagen, el "texto" no es fiable: omitir.
     if (a.querySelector('img')) continue;
     const shown = displayedHost(a.textContent ?? '');
@@ -565,22 +575,32 @@ let pendingLeaveUrl = '';
 
 /**
  * Confirmación anti-phishing antes de abrir un enlace externo (FR-08). Si el
- * enlace es engañoso (texto que aparenta un dominio distinto al real), el mismo
- * diálogo explica qué es un enlace engañoso y muestra ambos dominios.
+ * enlace es engañoso (texto que aparenta un dominio distinto al real) o
+ * homográfico (host IDN que imita letras latinas con otra escritura), el mismo
+ * diálogo lo explica.
  */
-function confirmLeave(url: string, mismatch: { shown: string; real: string } | null): void {
+function confirmLeave(
+  url: string,
+  warn: { deceptive: { shown: string; real: string } | null; homograph: string | null }
+): void {
   pendingLeaveUrl = url;
   el.leaveUrl.value = url;
   el.leaveUrl.scrollTop = 0;
-  if (mismatch) {
-    el.leaveMismatch.hidden = false;
-    el.leaveMismatch.textContent =
-      `⚠ ${t('link.mismatch')}: ${t('link.shows')} «${mismatch.shown}» · ` +
-      `${t('link.goesTo')} ${mismatch.real}. ${t('leave.mismatchExplain')}`;
-  } else {
-    el.leaveMismatch.hidden = true;
-    el.leaveMismatch.textContent = '';
+  const lines: string[] = [];
+  if (warn.homograph) {
+    lines.push(
+      `⚠ ${t('link.homograph')}: ${t('link.looksLike')} «${warn.homograph}». ` +
+        `${t('leave.homographExplain')}`
+    );
   }
+  if (warn.deceptive) {
+    lines.push(
+      `⚠ ${t('link.mismatch')}: ${t('link.shows')} «${warn.deceptive.shown}» · ` +
+        `${t('link.goesTo')} ${warn.deceptive.real}. ${t('leave.mismatchExplain')}`
+    );
+  }
+  el.leaveMismatch.hidden = lines.length === 0;
+  el.leaveMismatch.textContent = lines.join('\n\n');
   el.leaveDialog.showModal();
   // El foco arranca en Cancelar (acción segura por defecto).
   $('btn-leave-cancel').focus();

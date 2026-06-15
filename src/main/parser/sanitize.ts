@@ -1,5 +1,6 @@
 import createDOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
+import { homographRisk } from './homograph';
 
 /**
  * Sanitización del HTML del correo en el proceso main (FR-08, §7.3).
@@ -41,6 +42,15 @@ purifier.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A' && node.hasAttribute('href')) {
     node.setAttribute('rel', 'noreferrer noopener');
     node.setAttribute('target', '_blank');
+    // Homografía IDN: si el host real imita letras latinas con otra escritura,
+    // se anota el host decodificado para que el renderer avise (data-homograph).
+    try {
+      const { hostname } = new URL(node.getAttribute('href') ?? '');
+      const { risk, decoded } = homographRisk(hostname);
+      if (risk) node.setAttribute('data-homograph', decoded);
+    } catch {
+      // href relativo o inválido: nada que analizar.
+    }
   }
 });
 
