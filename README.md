@@ -73,13 +73,29 @@ chmod +x "MSG Viewer-x.y.z-x86_64.AppImage"
 
 **macOS** — monta el `.dmg` y arrastra la app a Aplicaciones (macOS 12+, binario universal).
 
+> **App sin firmar:** MSG Viewer es gratuita (GPL) y no está firmada ni
+> notarizada por Apple (el Developer Program cuesta 99 USD/año). macOS la
+> bloqueará la primera vez con un aviso de desarrollador no identificado. Para
+> abrirla:
+>
+> - **Opción A:** clic derecho sobre la app → **Abrir** → confirma **Abrir** en
+>   el diálogo. Solo hace falta la primera vez.
+> - **Opción B (Terminal):** quita el atributo de cuarentena y ábrela normal:
+>
+>   ```bash
+>   xattr -dr com.apple.quarantine "/Applications/MSG Viewer.app"
+>   ```
+>
+> Esto no compromete la seguridad: el código es abierto y la app funciona 100%
+> offline. La firma se añadirá si en el futuro se costea la cuenta de Apple.
+
 ## Limitaciones conocidas (por diseño)
 
 | | |
 |---|---|
 | RTF→HTML aproximado | Si el mensaje solo trae RTF puro (sin HTML nativo ni encapsulado), la conversión es una aproximación. |
 | EML reconstruido | El EML se genera desde las propiedades MAPI; no es byte-equivalente al mensaje SMTP original. |
-| Imágenes remotas | Bloqueadas siempre (placeholder); las incrustadas sí se muestran. |
+| Imágenes remotas | Bloqueadas por defecto (placeholder); cargables con un clic tras un aviso de rastreo. Las incrustadas sí se muestran. |
 | PNG ≤ 20.000 px | Para correos más largos, la app ofrece truncar o sugiere PDF. |
 | Tipos no soportados | Citas, contactos y tareas se informan como no soportados; S/MIME cifrado no puede mostrarse; las firmas se indican pero no se verifican. |
 
