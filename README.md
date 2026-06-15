@@ -68,12 +68,7 @@ nunca abandona tu equipo.
 Descarga el último AppImage, lo deja en `~/.local/bin` y lo añade al menú de aplicaciones:
 
 ```bash
-mkdir -p ~/.local/bin ~/.local/share/applications && \
-curl -fL "$(curl -fsSL https://api.github.com/repos/oscarhenriquezg/msgview/releases/latest | grep -oE 'https://[^"]*x86_64\.AppImage')" -o ~/.local/bin/MSGViewer.AppImage && \
-chmod +x ~/.local/bin/MSGViewer.AppImage && \
-printf '[Desktop Entry]\nType=Application\nName=MSG Viewer\nExec=%s/.local/bin/MSGViewer.AppImage %%f\nIcon=msg-viewer\nMimeType=application/vnd.ms-outlook;\nCategories=Office;\nTerminal=false\n' "$HOME" > ~/.local/share/applications/msg-viewer.desktop && \
-update-desktop-database ~/.local/share/applications 2>/dev/null; \
-echo "✓ Instalado. Ejecuta: ~/.local/bin/MSGViewer.AppImage"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/oscarhenriquezg/msgview/main/scripts/install.sh)"
 ```
 
 > Los AppImage requieren **FUSE2** (`libfuse2`). Si al arrancar ves un error de
