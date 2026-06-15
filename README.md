@@ -37,7 +37,7 @@ nunca abandona tu equipo.
 
 | Característica | Detalle |
 |---|---|
-| **Barra de herramientas** | Iconos [Lucide](https://lucide.dev): Nuevo · Abrir · Guardar como · Imprimir · Copiar · Buscar · Exportar · zoom del cuerpo · oscurecer el cuerpo · Unlink · metadatos · código fuente · Acerca de |
+| **Barra de herramientas** | Iconos [Lucide](https://lucide.dev): Nuevo · Abrir · Guardar como · Copiar · Buscar · zoom del cuerpo · oscurecer el cuerpo · Unlink · resaltar enlaces engañosos · código fuente · Exportar · Acerca de (Imprimir sigue en el menú, Ctrl+P) |
 | **Exportar** (9 formatos) | **PDF** (A4/Carta), **EML**, **PNG** (+copiar al portapapeles), **HTML**, **TXT**, **Markdown**, **MHT** (web con imágenes embebidas), **JSON** (pipelines) y **ZIP** (correo + metadata + cuerpos + adjuntos) |
 | **Guardar como…** | Un diálogo con **los mismos formatos que Exportar** (+ el original); el formato se decide por la extensión elegida (Ctrl+S) |
 | **Copiar con formato** | Copia la selección (o todo el cuerpo) conservando texto enriquecido e imágenes |

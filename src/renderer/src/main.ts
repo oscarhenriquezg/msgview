@@ -121,9 +121,19 @@ function showDocument(doc: MsgDocument): void {
   el.header.hidden = false;
   el.viewer.hidden = false;
 
-  el.subject.textContent = doc.metadata.subject || t('header.noSubject');
-  // El botón de copiar va inline, justo tras la última palabra del asunto.
-  el.subject.append($('btn-copy-subject'));
+  // El asunto es "Clic para copiar" (mismo patrón que las direcciones); solo
+  // cuando hay asunto real (no en "(sin asunto)").
+  const subject = doc.metadata.subject || '';
+  el.subject.textContent = subject || t('header.noSubject');
+  el.subject.classList.toggle('copyable', Boolean(subject));
+  el.subject.dataset.tip = t('meta.clickToCopy');
+  if (subject) {
+    el.subject.tabIndex = 0;
+    el.subject.setAttribute('role', 'button');
+  } else {
+    el.subject.removeAttribute('tabindex');
+    el.subject.removeAttribute('role');
+  }
   el.signatureBadge.hidden = !doc.metadata.hasSignature;
   el.signatureBadge.textContent = t('header.signature');
   renderMetaTable(doc);
@@ -934,7 +944,6 @@ async function init(): Promise<void> {
   iconBtn('btn-new', ICONS.new, t('actions.new'));
   iconBtn('btn-open', ICONS.open, t('actions.open'));
   iconBtn('btn-save-as', ICONS.save, t('actions.saveAs'));
-  iconBtn('btn-print', ICONS.print, t('actions.print'));
   iconBtn('btn-copy', ICONS.copy, t('actions.copy'));
   iconBtn('btn-find', ICONS.search, t('actions.find'));
   iconBtn('btn-zoom-in', ICONS.zoomIn, t('actions.zoomIn'));
@@ -942,12 +951,8 @@ async function init(): Promise<void> {
   iconBtn('btn-dark-body', ICONS.darkBody, t('actions.darkBody'));
   iconBtn('btn-unlink', ICONS.unlink, t('actions.unlink'));
   iconBtn('btn-link-warn', ICONS.linkWarn, t('actions.linkWarn'));
-  iconBtn('btn-meta-json', ICONS.metaJson, t('actions.metaJson'));
-  iconBtn('btn-meta-txt', ICONS.metaTxt, t('actions.metaTxt'));
   iconBtn('btn-source', ICONS.source, t('actions.source'));
   iconBtn('btn-about', ICONS.about, t('actions.about'));
-  iconBtn('btn-copy-subject', ICONS.copy, t('actions.copySubject'));
-  $('btn-copy-subject').dataset.tip = t('actions.copySubject');
   $('unlink-icon').innerHTML = ICONS.shield;
   $('unlink-title').textContent = t('unlink.title');
   $('unlink-body').textContent = t('unlink.body');
@@ -986,13 +991,6 @@ async function init(): Promise<void> {
   });
   $('btn-open').addEventListener('click', () => void openDialog());
   $('btn-save-as').addEventListener('click', () => void doSaveAs());
-  $('btn-print').addEventListener('click', () => {
-    void api.printDocument().then((r) => {
-      if (!r.ok && r.reason === 'error') {
-        toast(`${t('toast.printError')}: ${r.detail ?? ''}`, undefined, true);
-      }
-    });
-  });
   $('btn-find').addEventListener('click', () => {
     if (el.findbar.hidden) openFindBar();
     else closeFindBar();
@@ -1041,13 +1039,16 @@ async function init(): Promise<void> {
     el.leaveDialog.close();
     pendingLeaveUrl = '';
   });
-  $('btn-copy-subject').addEventListener('click', () => {
-    if (!currentDoc) return;
-    api.copyText(currentDoc.metadata.subject || '');
+  const copySubject = (): void => {
+    const subject = currentDoc?.metadata.subject;
+    if (!subject) return;
+    api.copyText(subject);
     toast(t('toast.copied', { what: t('header.subject') }));
+  };
+  el.subject.addEventListener('click', copySubject);
+  el.subject.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') copySubject();
   });
-  $('btn-meta-json').addEventListener('click', () => copyMetadata('json'));
-  $('btn-meta-txt').addEventListener('click', () => copyMetadata('text'));
   $('btn-source').addEventListener('click', () => api.viewSource());
   $('btn-about').addEventListener('click', () => openAboutDialog());
   $('btn-about-close').addEventListener('click', () => el.aboutDialog.close());

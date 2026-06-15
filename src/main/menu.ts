@@ -291,6 +291,7 @@ export function installMenu(opts: MenuOptions): void {
         {
           id: 'copy-meta-json',
           label: s.copyMetaJson,
+          accelerator: 'CmdOrCtrl+Alt+C',
           enabled: false,
           click: () => sendToFocused({ type: 'copy-meta', as: 'json' })
         }
@@ -319,6 +320,7 @@ export function installMenu(opts: MenuOptions): void {
         {
           id: 'view-source',
           label: s.source,
+          accelerator: 'CmdOrCtrl+U',
           enabled: false,
           click: () => sendToFocused({ type: 'source' })
         },

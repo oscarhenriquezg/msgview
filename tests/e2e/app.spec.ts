@@ -295,11 +295,14 @@ test('zoom y modo oscuro afectan solo al cuerpo; copiar vuelca su texto', async 
   expect(await app.evaluate(({ clipboard }) => clipboard.readHTML())).toMatch(/<b\b/i);
 });
 
-test('copiar: botón de asunto y direcciones copiables con aviso inmediato', async () => {
+test('copiar: asunto y direcciones copiables con aviso inmediato', async () => {
   await launch(join(FIXTURES, 'html-basic.msg'));
-  await expect(page.locator('#subject')).toHaveText('Informe trimestral Q2');
-  // Botón de copiar a la derecha del asunto.
-  await page.locator('#btn-copy-subject').click();
+  const subject = page.locator('#subject');
+  await expect(subject).toHaveText('Informe trimestral Q2');
+  // El asunto es "Clic para copiar": clase copyable + tooltip data-tip inmediato.
+  await expect(subject).toHaveClass(/copyable/);
+  await expect(subject).toHaveAttribute('data-tip', /copiar|copy/i);
+  await subject.click();
   expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Informe trimestral Q2');
   // Dirección: clase copyable + tooltip data-tip inmediato; clic copia el email.
   const from = page.locator('#meta-table .email-copy').first();

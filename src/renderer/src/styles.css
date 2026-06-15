@@ -58,26 +58,6 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-/* Botón de copiar el asunto: inline, pegado a la última palabra del título. */
-.subject-copy {
-  display: inline-flex;
-  vertical-align: middle;
-  margin-left: 6px;
-  padding: 2px;
-  line-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.subject-copy:hover { color: var(--accent); border-color: var(--accent); }
-.subject-copy:disabled { opacity: 0.45; cursor: default; }
-.subject-copy svg { width: 14px; height: 14px; }
-/* El tooltip se ancla a la derecha del botón para no cortarse en el borde. */
-.subject-copy.copyable:hover::after,
-.subject-copy.copyable:focus-visible::after { left: auto; right: 0; }
-
 /* Tooltip "Clic para copiar" inmediato (sin la demora del title nativo). */
 .copyable { position: relative; cursor: pointer; }
 .copyable:hover::after,
@@ -153,6 +133,8 @@ h1 {
   padding: 8px 16px;
 }
 .toolbar .divider { width: 1px; align-self: stretch; background: var(--border); margin: 2px 2px; }
+/* Empuja Exportar y Acerca de al extremo derecho de la barra. */
+.toolbar .spacer { flex: 1 1 auto; }
 .iconbtn { padding: 6px 8px; line-height: 0; }
 .toolbar svg { width: 17px; height: 17px; stroke-width: 2; vertical-align: middle; }
 .exportbtn {
@@ -169,7 +151,8 @@ h1 {
 .export-menu {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
+  /* Anclado a la derecha: el botón vive en el extremo derecho de la barra. */
+  right: 0;
   z-index: 20;
   min-width: 200px;
   padding: 4px;

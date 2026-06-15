@@ -15,28 +15,23 @@
       <button id="btn-open" class="btn iconbtn"></button>
       <button id="btn-save-as" class="btn iconbtn" data-needs-doc></button>
       <span class="divider" aria-hidden="true"></span>
-      <button id="btn-print" class="btn iconbtn" data-needs-doc></button>
-      <span class="divider" aria-hidden="true"></span>
       <button id="btn-copy" class="btn iconbtn" data-needs-doc></button>
       <button id="btn-find" class="btn iconbtn" data-needs-doc></button>
-      <span class="divider" aria-hidden="true"></span>
-      <div id="export-wrap" class="export-wrap">
-        <button id="btn-export" class="btn exportbtn" data-needs-doc
-                aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu"></button>
-        <div id="export-menu" class="export-menu" role="menu" hidden></div>
-      </div>
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-zoom-in" class="btn iconbtn" data-needs-doc></button>
       <button id="btn-zoom-out" class="btn iconbtn" data-needs-doc></button>
       <button id="btn-dark-body" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
       <span class="divider" aria-hidden="true"></span>
       <button id="btn-unlink" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
-      <button id="btn-link-warn" class="btn iconbtn" data-needs-doc aria-pressed="true"></button>
+      <button id="btn-link-warn" class="btn iconbtn" data-needs-doc aria-pressed="false"></button>
       <span class="divider" aria-hidden="true"></span>
-      <button id="btn-meta-json" class="btn iconbtn" data-needs-doc></button>
-      <button id="btn-meta-txt" class="btn iconbtn" data-needs-doc></button>
       <button id="btn-source" class="btn iconbtn" data-needs-doc></button>
-      <span class="divider" aria-hidden="true"></span>
+      <span class="spacer" aria-hidden="true"></span>
+      <div id="export-wrap" class="export-wrap">
+        <button id="btn-export" class="btn exportbtn" data-needs-doc
+                aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu"></button>
+        <div id="export-menu" class="export-menu" role="menu" hidden></div>
+      </div>
       <button id="btn-about" class="btn iconbtn"></button>
     </nav>
 
@@ -45,7 +40,6 @@
       <div class="header-top">
         <div class="meta">
           <h1 id="subject"></h1>
-          <button id="btn-copy-subject" class="subject-copy copyable" data-needs-doc></button>
           <div id="signature-badge" class="badge" hidden></div>
           <table id="meta-table" aria-label="Metadatos del mensaje"></table>
         </div>
