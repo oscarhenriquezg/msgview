@@ -1,0 +1,43 @@
+# Actualizaciones automáticas de dependencias (seguridad y mantenimiento).
+# Agrupado a propósito para minimizar el ruido de PRs: los parches y versiones
+# menores llegan en un único PR por categoría; solo los "major" (que pueden
+# romper) abren PR individual para revisarse con calma.
+version: 2
+updates:
+  # Dependencias npm del proyecto.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+    groups:
+      # Un solo PR para todo lo de desarrollo (no viaja en el binario).
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # Un solo PR para parches y versiones menores de producción.
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+
+  # Las propias GitHub Actions usadas en los workflows del CI.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - "*"
