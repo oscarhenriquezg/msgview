@@ -16,6 +16,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Red de seguridad: falla solo ante CVEs altas/críticas en dependencias
+      # que SÍ se distribuyen en el binario (--omit=dev evita el ruido de las
+      # herramientas de desarrollo, que no viajan en el AppImage).
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run fixtures
