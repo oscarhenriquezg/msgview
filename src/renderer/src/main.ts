@@ -540,6 +540,17 @@ function openAssociateDialog(): void {
   el.associateDialog.showModal();
 }
 
+/**
+ * Al inicio: si los tipos de correo no están asociados, ofrece asociarlos.
+ * main decide cuándo procede (solo ventana principal, Linux, no descartado).
+ */
+async function maybeOfferAssociation(): Promise<void> {
+  const { offer } = await api.checkAssociation();
+  if (!offer) return;
+  ($('assoc-offer-dontask') as HTMLInputElement).checked = false;
+  el.assocOfferDialog.showModal();
+}
+
 /** Abre el diálogo (estilo Unlink) para activar/desactivar el aviso de enlaces. */
 function openLinkwarnDialog(): void {
   const off = mismatchHighlight; // si está activo, la acción será desactivar
@@ -1166,6 +1177,17 @@ async function init(): Promise<void> {
     ).map((c) => c.value);
     if (exts.length > 0) api.associateTypes(exts);
   });
+  $('btn-assoc-offer-yes').addEventListener('click', () => {
+    el.assocOfferDialog.close();
+    // Asociar los tres tipos de correo de una vez.
+    api.associateTypes(['msg', 'eml', 'emlx']);
+  });
+  $('btn-assoc-offer-no').addEventListener('click', () => {
+    el.assocOfferDialog.close();
+    if (($('assoc-offer-dontask') as HTMLInputElement).checked) {
+      api.dismissAssociationOffer();
+    }
+  });
   $('btn-error-open').addEventListener('click', () => void openDialog());
   $('btn-export').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1225,6 +1247,9 @@ async function init(): Promise<void> {
   const existing = await api.getCurrentDocument();
   if (existing) showDocument(existing);
   else showEmpty();
+
+  // Tras la carga inicial: ofrecer asociar los tipos de correo si procede.
+  void maybeOfferAssociation();
 }
 
 void init();

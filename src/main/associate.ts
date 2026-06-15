@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -95,5 +96,57 @@ ${customMimes
       `${es ? 'No se pudo asociar' : 'Could not associate'}: ${e instanceof Error ? e.message : String(e)}`,
       true
     );
+  }
+}
+
+function settingsPath(): string {
+  return join(app.getPath('userData'), 'settings.json');
+}
+
+function readSettings(): Record<string, unknown> {
+  try {
+    const raw = JSON.parse(readFileSync(settingsPath(), 'utf-8')) as unknown;
+    return raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** El usuario marcó "no volver a preguntar" en el ofrecimiento de asociación. */
+export function isAssocPromptDismissed(): boolean {
+  return readSettings()['assocPromptDismissed'] === true;
+}
+
+export function setAssocPromptDismissed(dismissed: boolean): void {
+  try {
+    writeFileSync(
+      settingsPath(),
+      JSON.stringify({ ...readSettings(), assocPromptDismissed: dismissed }, null, 2),
+      'utf-8'
+    );
+  } catch {
+    // sin persistencia se volverá a ofrecer; no rompe nada
+  }
+}
+
+/**
+ * ¿Es ya esta app el manejador predeterminado de los tipos de correo? (Linux).
+ * Fuera de Linux no hay registro programático (macOS usa Finder), así que se
+ * considera "asociado" para no ofrecer nada. Si `xdg-mime` no está disponible,
+ * tampoco se podría registrar: se omite igualmente el ofrecimiento.
+ */
+export async function fileTypesAssociated(): Promise<boolean> {
+  if (process.platform !== 'linux') return true;
+  const appImage = process.env['APPIMAGE'];
+  const isDev = !app.isPackaged && !appImage;
+  const desktopId = isDev ? 'msg-viewer-dev.desktop' : 'msg-viewer.desktop';
+  try {
+    for (const t of FILE_TYPES) {
+      const { stdout } = await run('xdg-mime', ['query', 'default', t.mime]);
+      if (stdout.trim() !== desktopId) return false;
+    }
+    return true;
+  } catch {
+    return true; // xdg-mime ausente: no ofrecer (no se podría registrar)
   }
 }

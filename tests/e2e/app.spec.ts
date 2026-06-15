@@ -14,15 +14,20 @@ const FIXTURES = join(ROOT, 'tests', 'fixtures');
 let app: ElectronApplication;
 let page: Page;
 
-async function launch(...args: string[]): Promise<void> {
+async function launchWithEnv(extraEnv: Record<string, string>, ...args: string[]): Promise<void> {
   // userData aislado: no colisiona con una instancia del usuario en marcha.
   const userData = mkdtempSync(join(tmpdir(), 'msgviewer-userdata-'));
   app = await electron.launch({
     args: ['.', ...args],
     cwd: ROOT,
-    env: { ...process.env, MSG_VIEWER_USER_DATA: userData }
+    env: { ...process.env, MSG_VIEWER_USER_DATA: userData, ...extraEnv }
   });
   page = await app.firstWindow();
+}
+
+async function launch(...args: string[]): Promise<void> {
+  // El ofrecimiento de asociación al inicio se omite salvo en su propio test.
+  await launchWithEnv({ MSG_VIEWER_NO_ASSOC_PROMPT: '1' }, ...args);
 }
 
 test.afterEach(async () => {
@@ -466,4 +471,32 @@ test('imagen remota bloqueada: clic ofrece cargarla con aviso de rastreo', async
   await page.locator('#btn-remote-img-cancel').click();
   await expect(page.locator('#remote-img-dialog')).toBeHidden();
   await expect(blocked).toHaveCount(1);
+});
+
+test('al inicio ofrece asociar los tipos de correo si no están asociados', async () => {
+  await launchWithEnv({ MSG_VIEWER_FORCE_ASSOC_PROMPT: '1' });
+  // El ofrecimiento aparece tras la carga inicial.
+  await expect(page.locator('#assoc-offer-dialog')).toBeVisible();
+  await expect(page.locator('#btn-assoc-offer-yes')).toBeVisible();
+  // "Ahora no" lo cierra sin asociar nada.
+  await page.locator('#btn-assoc-offer-no').click();
+  await expect(page.locator('#assoc-offer-dialog')).toBeHidden();
+});
+
+test('asociar desde el ofrecimiento registra los tres tipos de correo', async () => {
+  await launchWithEnv({ MSG_VIEWER_FORCE_ASSOC_PROMPT: '1' });
+  // Captura las extensiones que el renderer pide asociar.
+  await app.evaluate(({ ipcMain }) => {
+    (globalThis as { __assoc?: string[] }).__assoc = [];
+    ipcMain.removeAllListeners('associate-types');
+    ipcMain.on('associate-types', (_e, exts: string[]) => {
+      (globalThis as { __assoc?: string[] }).__assoc = exts;
+    });
+  });
+  await expect(page.locator('#assoc-offer-dialog')).toBeVisible();
+  await page.locator('#btn-assoc-offer-yes').click();
+  await expect(page.locator('#assoc-offer-dialog')).toBeHidden();
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as { __assoc?: string[] }).__assoc))
+    .toEqual(['msg', 'eml', 'emlx']);
 });

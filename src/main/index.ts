@@ -27,7 +27,12 @@ import { documentToText } from './export/textout';
 import { documentToMarkdown } from './export/markdown';
 import { documentToJson, exportMht, exportZip } from './export/bundle';
 import { APP_ICON_PATH, REPO_URL, installContextMenu, installMenu, setExportEnabled } from './menu';
-import { registerFileTypes } from './associate';
+import {
+  fileTypesAssociated,
+  isAssocPromptDismissed,
+  registerFileTypes,
+  setAssocPromptDismissed
+} from './associate';
 import { MAX_EMBEDDED_DEPTH } from './parser/limits';
 import { getAnyAttachment, isCfbf } from './parser/AnyMessage';
 import { MsgAdapter } from './parser/MsgAdapter';
@@ -684,6 +689,22 @@ function registerIpc(): void {
     if (!Array.isArray(exts) || exts.length === 0) return;
     void registerFileTypes(exts, BrowserWindow.fromWebContents(e.sender));
   });
+
+  // Al inicio el renderer pregunta si debe ofrecer asociar los tipos de correo.
+  // Solo en la ventana principal, en Linux, si no están ya asociados y el
+  // usuario no pidió "no volver a preguntar".
+  ipcMain.handle('check-association', async (e): Promise<{ offer: boolean }> => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win !== mainWindow) return { offer: false };
+    // Hooks de prueba: forzar u omitir el ofrecimiento de forma determinista.
+    if (process.env['MSG_VIEWER_FORCE_ASSOC_PROMPT']) return { offer: true };
+    if (process.env['MSG_VIEWER_NO_ASSOC_PROMPT'] || isAssocPromptDismissed()) {
+      return { offer: false };
+    }
+    return { offer: !(await fileTypesAssociated()) };
+  });
+
+  ipcMain.on('dismiss-association-offer', () => setAssocPromptDismissed(true));
 
   // Abre el enlace externo en el navegador. La confirmación anti-phishing la
   // muestra el renderer (diálogo propio con la URL en una caja, sin deformarse);

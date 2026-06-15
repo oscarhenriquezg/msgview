@@ -142,6 +142,13 @@ export interface MsgViewerApi {
   /** Asocia los tipos de archivo elegidos con la app (FR-01, Linux). */
   associateTypes(exts: string[]): void;
   /**
+   * Al inicio: ¿debe ofrecerse asociar los tipos de correo? `offer` es true solo
+   * en la ventana principal (Linux) si no están asociados y no se descartó antes.
+   */
+  checkAssociation(): Promise<{ offer: boolean }>;
+  /** El usuario pidió no volver a recibir el ofrecimiento de asociación. */
+  dismissAssociationOffer(): void;
+  /**
    * Solicita abrir una URL externa en el navegador del sistema; main
    * muestra la advertencia de confianza antes de salir del visor.
    */
