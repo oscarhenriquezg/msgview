@@ -3,11 +3,11 @@ import type { LoadResult, MsgDocument, MsgRecipient } from '@shared/types';
 import { isUsableSmtp } from './address';
 import { MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INLINE_IMAGE_BYTES, MAX_TOTAL_INLINE_BYTES } from './limits';
 import { plainTextToHtml } from './rtf';
-import { sanitizeEmailHtml } from './sanitize';
 
 /**
  * Adapter para mensajes RFC 5322 (.eml), simétrico a MsgAdapter: produce el
- * mismo MsgDocument sanitizado. mailparser queda encapsulado aquí (NFR-09).
+ * mismo MsgDocument. El cuerpo va crudo (con inline resuelto); lo sanitiza el
+ * renderer (perf). mailparser queda encapsulado aquí (NFR-09).
  */
 
 function flattenAddresses(
@@ -101,7 +101,7 @@ export async function parseEml(buffer: Buffer, sourcePath: string): Promise<Load
       hasSignature: attachmentsRaw.some((a) => /pkcs7-signature/i.test(a.contentType ?? '')),
       importance: undefined
     },
-    bodyHtml: sanitizeEmailHtml(html),
+    bodyHtml: html,
     bodySource: source,
     attachments,
     sourcePath

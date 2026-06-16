@@ -1,9 +1,13 @@
 import type { MsgDocument } from '@shared/types';
+import { sanitizeEmailHtml } from '../parser/sanitize';
 
 /**
  * Documento HTML autónomo (cabecera de metadatos + cuerpo renderizado)
  * usado por las exportaciones PDF y PNG (FR-11, FR-13, §7.4).
- * El cuerpo ya viene sanitizado por el parser.
+ * El cuerpo del worker viene CRUDO (lo sanitiza el renderer al mostrar); aquí
+ * se sanitiza antes de renderizarlo en la ventana de impresión (seguridad: si
+ * no, el offscreen intentaría cargar imágenes remotas y se colgaría, y el
+ * export saldría sin sanitizar).
  */
 
 const esc = (s: string) =>
@@ -59,7 +63,7 @@ export function buildPrintableHtml(doc: MsgDocument, locale: string): string {
       ${addressLine(locale.startsWith('es') ? 'Recibido' : 'Received', fmtDate(m.receivedDate, locale))}
     </table>
   </div>
-  <div class="body">${doc.bodyHtml}</div>
+  <div class="body">${sanitizeEmailHtml(doc.bodyHtml)}</div>
 </body>
 </html>`;
 }

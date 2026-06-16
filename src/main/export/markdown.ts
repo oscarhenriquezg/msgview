@@ -1,5 +1,6 @@
 import { JSDOM } from 'jsdom';
 import type { MsgDocument } from '@shared/types';
+import { sanitizeEmailHtml } from '../parser/sanitize';
 
 /**
  * "Exportar/Guardar como Markdown": cabecera de metadatos + cuerpo convertido
@@ -31,7 +32,7 @@ export function documentToMarkdown(doc: MsgDocument): string {
   if (files.length > 0) lines.push(`**Attachments:** ${files.join('; ')}  `);
   lines.push('', '---', '');
 
-  const dom = new JSDOM(`<body>${doc.bodyHtml}</body>`);
+  const dom = new JSDOM(`<body>${sanitizeEmailHtml(doc.bodyHtml)}</body>`);
   const body = dom.window.document.body;
   const md = nodesToMarkdown(body.childNodes, dom.window);
   lines.push(md.replace(/\n{3,}/g, '\n\n').trim(), '');

@@ -1,58 +1,22 @@
 import createDOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
-import { homographRisk } from './homograph';
+import { installSanitizeHooks, sanitizeEmailHtml as runSanitize, type Purifier } from '@shared/sanitize-policy';
 
 /**
- * Sanitización del HTML del correo en el proceso main (FR-08, §7.3).
- * El renderer recibe HTML ya sanitizado; el iframe sandbox + CSP son las
- * capas adicionales (defensa en profundidad).
+ * Sanitización en el proceso main, SOLO para la vista de código fuente
+ * (qué intentó ejecutar el correo: DOMPurify expone `removed`). El cuerpo que
+ * se muestra lo sanitiza el renderer con DOM nativo; esto se importa de forma
+ * diferida (perf) y por eso jsdom no entra en el arranque. La política vive en
+ * [@shared/sanitize-policy] y es la misma que usa el renderer.
  */
 
 const window = new JSDOM('').window;
 const purifier = createDOMPurify(window);
+installSanitizeHooks(purifier as unknown as Purifier);
 
-/** Placeholder SVG inline para imágenes remotas bloqueadas (L-03). */
-const REMOTE_IMG_PLACEHOLDER =
-  'data:image/svg+xml;base64,' +
-  Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="110" viewBox="0 0 160 110">` +
-      `<rect width="160" height="110" fill="#e8e8e8" stroke="#bbb" stroke-dasharray="4"/>` +
-      `<text x="80" y="42" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">Imagen remota</text>` +
-      `<text x="80" y="58" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#888">bloqueada</text>` +
-      `<text x="80" y="82" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#3b82f6">Clic para cargar</text>` +
-      `</svg>`
-  ).toString('base64');
-
-purifier.addHook('afterSanitizeAttributes', (node) => {
-  // L-03: las imágenes remotas no se cargan; placeholder visible.
-  if (node.tagName === 'IMG') {
-    const src = node.getAttribute('src') ?? '';
-    if (/^(https?|ftp):/i.test(src)) {
-      node.setAttribute('data-blocked-src', src);
-      node.setAttribute('src', REMOTE_IMG_PLACEHOLDER);
-      node.setAttribute('title', src);
-    }
-  }
-  // Atributos background= heredados de HTML antiguo de Outlook.
-  if (node.hasAttribute('background')) {
-    const bg = node.getAttribute('background') ?? '';
-    if (!/^data:/i.test(bg)) node.removeAttribute('background');
-  }
-  // Los enlaces no deben navegar dentro del iframe sandbox.
-  if (node.tagName === 'A' && node.hasAttribute('href')) {
-    node.setAttribute('rel', 'noreferrer noopener');
-    node.setAttribute('target', '_blank');
-    // Homografía IDN: si el host real imita letras latinas con otra escritura,
-    // se anota el host decodificado para que el renderer avise (data-homograph).
-    try {
-      const { hostname } = new URL(node.getAttribute('href') ?? '');
-      const { risk, decoded } = homographRisk(hostname);
-      if (risk) node.setAttribute('data-homograph', decoded);
-    } catch {
-      // href relativo o inválido: nada que analizar.
-    }
-  }
-});
+export function sanitizeEmailHtml(html: string): string {
+  return runSanitize(purifier as unknown as Purifier, html);
+}
 
 /**
  * Sanitiza e informa qué se eliminó (vista de código fuente: evidencia de
@@ -74,16 +38,4 @@ export function sanitizeWithReport(html: string): { clean: string; removed: stri
     return JSON.stringify(entry).slice(0, 160);
   });
   return { clean, removed };
-}
-
-export function sanitizeEmailHtml(html: string): string {
-  return purifier.sanitize(html, {
-    WHOLE_DOCUMENT: true,
-    // El correo puede traer <style>; el iframe aísla su alcance (FR-08).
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'select', 'textarea', 'base', 'link', 'meta'],
-    FORBID_ATTR: ['srcset', 'formaction', 'ping'],
-    ALLOW_DATA_ATTR: false,
-    // data: solo tiene sentido para imágenes; DOMPurify ya lo restringe así.
-    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|data):|[^a-z+.-]|[a-z+.-]*(?:[^a-z+.:-]|$))/i
-  });
 }

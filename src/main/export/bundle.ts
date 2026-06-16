@@ -2,6 +2,7 @@ import { createWriteStream } from 'node:fs';
 import { ZipArchive } from 'archiver';
 import type { ExportResult, MsgDocument } from '@shared/types';
 import { getAnyAttachment } from '../parser/AnyMessage';
+import { sanitizeEmailHtml } from '../parser/sanitize';
 import { documentToText } from './textout';
 
 /** MIME por extensión para las partes MHTML y los nombres del ZIP. */
@@ -33,7 +34,7 @@ export function documentToJson(doc: MsgDocument): string {
       messageClass: m.messageClass,
       signaturePresent: m.hasSignature,
       bodySource: doc.bodySource,
-      bodyHtml: doc.bodyHtml,
+      bodyHtml: sanitizeEmailHtml(doc.bodyHtml),
       attachments: doc.attachments.map((a) => ({
         fileName: a.fileName,
         extension: a.extension,

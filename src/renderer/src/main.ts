@@ -3,6 +3,7 @@ import { MAX_PNG_HEIGHT } from '@shared/types';
 import { isExecutableAttachment } from '@shared/executable';
 import { ICONS } from './icons';
 import { initI18n, locale, t } from './i18n';
+import { sanitizeEmailHtml } from './sanitize';
 
 const api = window.msgViewer;
 
@@ -348,10 +349,11 @@ function renderAttachments(attachments: MsgAttachmentMeta[]): void {
 }
 
 // ---------------------------------------------------------------------------
-// Cuerpo (FR-08): iframe sandbox + CSP; el HTML ya viene sanitizado de main
+// Cuerpo (FR-08): se sanitiza aquí (DOM nativo) y se pinta en iframe sandbox + CSP
 // ---------------------------------------------------------------------------
 
-function renderBody(sanitizedHtml: string): void {
+function renderBody(rawHtml: string): void {
+  const sanitizedHtml = sanitizeEmailHtml(rawHtml);
   // FR-02b: los eventos de arrastre no cruzan al padre; se enganchan dentro.
   // El iframe es allow-same-origin sin allow-scripts: accesible e inerte.
   el.bodyFrame.onload = () => {

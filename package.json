@@ -1,6 +1,6 @@
 {
   "name": "msg-viewer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Visor multiplataforma de archivos .msg de Outlook",
   "scripts": {
     "test": "vitest run",

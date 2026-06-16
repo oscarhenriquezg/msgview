@@ -41,7 +41,7 @@ import { addRecent, clearRecents, existingRecents } from './recents';
 import { parseAuthResults, parseReceivedChain } from './headers-analysis';
 import { sanitizeWithReport } from './parser/sanitize';
 import { buildSourceViewHtml } from './sourceview';
-import { parseBytes, parseFile, shutdownParser } from './parsing';
+import { parseBytes, parseFile, shutdownParser, warmupParser } from './parsing';
 
 /**
  * Proceso main (§7.3): única zona con acceso a disco y diálogos nativos.
@@ -163,9 +163,11 @@ if (!locked) {
 }
 
 function bootstrap(): void {
-  // Render por software: evita el crash del proceso GPU en sesiones
-  // Wayland/Vulkan problemáticas y reduce huella de memoria (NFR-02).
-  app.disableHardwareAcceleration();
+  // Render por software SOLO en Linux: evita el crash del proceso GPU en
+  // sesiones Wayland/Vulkan problemáticas. En macOS/Windows la aceleración por
+  // hardware es estable y mejora notablemente el arranque y el pintado, así que
+  // no se desactiva allí (perf).
+  if (process.platform === 'linux') app.disableHardwareAcceleration();
 
   // macOS entrega rutas por evento open-file, incluso antes de ready (FR-01).
   app.on('open-file', (event, path) => {
@@ -192,6 +194,9 @@ function bootstrap(): void {
   ]);
 
   void app.whenReady().then(() => {
+    // Precalentar el worker YA: su carga de librerías corre en otro hilo, en
+    // paralelo a crear la ventana y cargar el renderer (perf, NFR-01).
+    warmupParser();
     setupNetworkBlocking();
     // Sirve desde memoria el documento imprimible y la vista de código
     // fuente (sin temporales, NFR-04).

@@ -45,6 +45,15 @@ function submit(job: Omit<ParseJob, 'id'>): Promise<LoadResult> {
   });
 }
 
+/**
+ * Precalentado (NFR-01, perf): crea el worker y dispara la carga de sus
+ * librerías en su propio hilo, en paralelo al arranque de la ventana/renderer,
+ * para que el parseo del primer mensaje no pague ese coste en el camino crítico.
+ */
+export function warmupParser(): void {
+  getWorker();
+}
+
 export function parseFile(filePath: string): Promise<LoadResult> {
   return submit({ filePath });
 }

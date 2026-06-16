@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { homographRisk } from '../../src/main/parser/homograph';
+import { homographRisk } from '../../src/shared/homograph';
 import { sanitizeEmailHtml } from '../../src/main/parser/sanitize';
 
 describe('homographRisk — homografía IDN (complemento a enlaces engañosos)', () => {

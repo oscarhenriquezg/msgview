@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { getAnyAttachment, parseAny } from '../../src/main/parser/AnyMessage';
+import { sanitizeEmailHtml } from '../../src/main/parser/sanitize';
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
 const load = (name: string) => readFileSync(join(FIXTURES, name));
@@ -26,7 +27,7 @@ describe('parseAny — archivos .eml (RFC 5322)', () => {
     const result = await parseAny(load('sample.eml'), 'sample.eml');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.document.bodyHtml).not.toContain('<script');
+    expect(sanitizeEmailHtml(result.document.bodyHtml)).not.toContain('<script');
     expect(result.document.bodyHtml).toContain('data:image/png;base64');
     expect(result.document.bodyHtml).not.toContain('cid:foto1');
   });

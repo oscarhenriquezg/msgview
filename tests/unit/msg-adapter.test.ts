@@ -3,6 +3,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseAny } from '../../src/main/parser/AnyMessage';
 import { MsgAdapter } from '../../src/main/parser/MsgAdapter';
+// El worker emite HTML crudo; la sanitización es un paso aparte (renderer en
+// producción, política compartida). Aquí se aplica para probar el pipeline.
+import { sanitizeEmailHtml } from '../../src/main/parser/sanitize';
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
 const load = (name: string) => readFileSync(join(FIXTURES, name));
@@ -87,12 +90,12 @@ describe('MsgAdapter — archivos válidos', () => {
   });
 });
 
-describe('MsgAdapter — sanitización (FR-08)', () => {
+describe('Sanitización del cuerpo (FR-08) — política compartida sobre la salida del worker', () => {
   it('elimina scripts, manejadores on* y javascript: URIs', () => {
     const result = parse('hostile-script.msg');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const html = result.document.bodyHtml;
+    const html = sanitizeEmailHtml(result.document.bodyHtml);
     expect(html).not.toContain('<script');
     expect(html).not.toContain('onload');
     expect(html).not.toContain('onclick');
@@ -105,7 +108,7 @@ describe('MsgAdapter — sanitización (FR-08)', () => {
     const result = parse('hostile-script.msg');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const html = result.document.bodyHtml;
+    const html = sanitizeEmailHtml(result.document.bodyHtml);
     expect(html).not.toMatch(/[^-]src="https?:\/\//);
     expect(html).toContain('data:image/svg+xml');
   });
@@ -174,7 +177,7 @@ describe('Corpus de mensajes reales (tests/fixtures/real/)', () => {
   it.each(files.length > 0 ? files : [])('parsea %s sin crash', async (file) => {
     const result = await parseAny(readFileSync(join(realDir, file)), file);
     if (result.ok) {
-      expect(result.document.bodyHtml).not.toContain('<script');
+      expect(sanitizeEmailHtml(result.document.bodyHtml)).not.toContain('<script');
     } else {
       expect(result.error.code).toBeTruthy();
     }

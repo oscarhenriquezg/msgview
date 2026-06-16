@@ -23,7 +23,6 @@ import {
 } from './limits';
 import { bestSmtpAddress } from './address';
 import { plainTextToHtml, rtfCompressedToHtml } from './rtf';
-import { sanitizeEmailHtml } from './sanitize';
 
 export interface EmlParts {
   metadata: MsgDocument['metadata'];
@@ -237,7 +236,8 @@ export class MsgAdapter {
     const withInline = html ? this.embedInlineImages(html, attachments) : '';
     return {
       metadata: this.extractMetadata(),
-      bodyHtml: sanitizeEmailHtml(withInline),
+      // Crudo (con imágenes inline ya resueltas): el renderer lo sanitiza (perf).
+      bodyHtml: withInline,
       bodySource: source,
       attachments,
       sourcePath

@@ -1,5 +1,6 @@
 import { JSDOM } from 'jsdom';
 import type { MsgDocument } from '@shared/types';
+import { sanitizeEmailHtml } from '../parser/sanitize';
 
 /** "Guardar como TXT": cabecera de metadatos + cuerpo en texto plano. */
 export function documentToText(doc: MsgDocument): string {
@@ -26,8 +27,8 @@ export function documentToText(doc: MsgDocument): string {
   if (files.length > 0) lines.push(`Attachments: ${files.join('; ')}`);
   lines.push('', '-'.repeat(60), '');
 
-  // El cuerpo ya está sanitizado; textContent elimina todo el marcado.
-  const dom = new JSDOM(`<body>${doc.bodyHtml}</body>`);
+  // El cuerpo viene crudo del worker; se sanitiza y textContent elimina el marcado.
+  const dom = new JSDOM(`<body>${sanitizeEmailHtml(doc.bodyHtml)}</body>`);
   const text = dom.window.document.body.textContent ?? '';
   lines.push(text.replace(/\n{3,}/g, '\n\n').trim());
   return lines.join('\n');
