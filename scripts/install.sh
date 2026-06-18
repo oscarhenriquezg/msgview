@@ -34,6 +34,61 @@ asset_url() {
   printf '%s\n' "$url"
 }
 
+# --- FUSE2: los AppImage necesitan libfuse.so.2 (FUSE 2, no FUSE 3) ----------
+has_fuse2() {
+  ldconfig -p 2>/dev/null | grep -q 'libfuse\.so\.2' && return 0
+  local p
+  for p in /usr/lib/libfuse.so.2 /usr/lib/*/libfuse.so.2 /lib/*/libfuse.so.2 /lib64/libfuse.so.2; do
+    [ -e "$p" ] && return 0
+  done
+  return 1
+}
+
+# Comando de instalación de FUSE2 según el gestor de paquetes de la distro.
+fuse2_install_cmd() {
+  if command -v apt-get >/dev/null 2>&1; then
+    # Ubuntu 24.04+ renombró el paquete a libfuse2t64.
+    echo 'sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64'
+  elif command -v dnf >/dev/null 2>&1; then
+    echo 'sudo dnf install -y fuse fuse-libs'
+  elif command -v pacman >/dev/null 2>&1; then
+    echo 'sudo pacman -S --needed --noconfirm fuse2'
+  elif command -v zypper >/dev/null 2>&1; then
+    echo 'sudo zypper install -y libfuse2'
+  fi
+}
+
+# Si falta FUSE2, lo ofrece (prompt en /dev/tty, porque en `curl | bash` el
+# stdin es el propio script). Sin tty o sin gestor conocido: muestra el comando.
+ensure_fuse2() {
+  local appimage="$1"
+  has_fuse2 && return 0
+  local cmd; cmd="$(fuse2_install_cmd)"
+  info "FUSE2 (libfuse.so.2) no está instalado; los AppImage lo necesitan para arrancar."
+  if [ -z "$cmd" ]; then
+    echo "  Instálalo con tu gestor (paquete libfuse2 / fuse-libs / fuse2),"
+    echo "  o ejecuta sin FUSE:  ${appimage} --appimage-extract-and-run"
+    return 0
+  fi
+  # Abrir /dev/tty de verdad (no solo comprobar -r): en `curl | bash` sin
+  # terminal usable, esto falla y caemos a mostrar el comando.
+  if { exec 3</dev/tty; } 2>/dev/null; then
+    printf '  ¿Instalarlo ahora? Se ejecutará (pedirá tu contraseña de sudo):\n    %s\n  [s/N] ' "$cmd"
+    local ans=''; read -r ans <&3 || ans=''
+    exec 3<&-
+    case "$ans" in
+      s|S|y|Y)
+        if eval "$cmd"; then ok "✓ FUSE2 instalado."
+        else echo "  No se pudo instalar. Hazlo a mano, o usa: ${appimage} --appimage-extract-and-run"; fi ;;
+      *) echo "  Saltado. Para instalarlo luego:  $cmd"
+         echo "  (o ejecuta sin FUSE:  ${appimage} --appimage-extract-and-run)" ;;
+    esac
+  else
+    echo "  Instálalo con:  $cmd"
+    echo "  (o ejecuta sin FUSE:  ${appimage} --appimage-extract-and-run)"
+  fi
+}
+
 install_linux() {
   [ "$arch" = "x86_64" ] || err "En Linux solo hay build x86_64 (detectado: ${arch})."
   local bin_dir="${HOME}/.local/bin" apps_dir="${HOME}/.local/share/applications"
@@ -58,13 +113,15 @@ Terminal=false
 EOF
   update-desktop-database "$apps_dir" >/dev/null 2>&1 || true
 
+  # Comprobar FUSE2 (requisito de los AppImage) y ofrecer instalarlo si falta.
+  ensure_fuse2 "$target"
+
   ok "✓ MSG Viewer instalado."
   echo "  Ejecutable: ${target}"
   case ":${PATH}:" in
     *":${bin_dir}:"*) echo "  Lánzalo con: MSGViewer.AppImage   (o desde el menú de apps)";;
     *) echo "  Añade ~/.local/bin al PATH, o lánzalo con: ${target}";;
   esac
-  echo "  Si ves un error de FUSE: instala libfuse2, o usa --appimage-extract-and-run"
 }
 
 install_macos() {
